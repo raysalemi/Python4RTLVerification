@@ -94,11 +94,11 @@ async def test_alu(dut):
     ConfigDB().set(None, "*", "DUT", dut)
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
-    bfm = AluDriverBfm(dut, "ALUDRIVERBFM")
+    bfm = AluDriverBfm(dut, "BFM")
     await bfm.reset()
     cocotb.fork(bfm.start())
     await FallingEdge(dut.clk)
-    test_thread = threading.Thread(target=run_uvm_test, args=("alu_test",), name="run_test")
+    test_thread = threading.Thread(target=run_uvm_test, args=("AluTest",), name="run_test")
     test_thread.start()
     await bfm.done.wait()
 
