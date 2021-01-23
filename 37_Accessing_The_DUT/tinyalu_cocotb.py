@@ -3,6 +3,14 @@ from cocotb.triggers import FallingEdge, RisingEdge
 import cocotb
 
 
+@cocotb.test()
+async def hello_world(dut):
+    print("Hello, world.")
+
+@cocotb.test(expect_fail=True)
+async def failure(dut):
+    assert False, "Oh, the humanity!"
+
 async def reset(dut):
     await FallingEdge(dut.clk)
     dut.reset_n = 0
@@ -11,10 +19,9 @@ async def reset(dut):
     dut.op = 0
     await FallingEdge(dut.clk)
     dut.reset_n = 1
-    await FallingEdge(dut.clk)
 
 
-@cocotb.test()
+@cocotb.test(expect_fail=False)
 async def test_alu(dut):
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
@@ -26,12 +33,8 @@ async def test_alu(dut):
     dut.start = 1
     await RisingEdge(dut.done)
     await FallingEdge(dut.clk)
-    if dut.result == 3:
-        print("Passed")
-    else:
-        print("Failed")
-
-
+    assert dut.result == 3, "Tinyalu Addition Failure"
+    print("TinyALU Passed")
 
 
 

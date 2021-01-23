@@ -1,4 +1,5 @@
 CWD=$(shell pwd)
+COCOTB_REDUCED_LOG_FMT = True
 SIM ?= icarus
 VERILOG_SOURCES =$(CWD)/hdl/verilog/tinyalu.sv
 MODULE := tinyalu_cocotb
