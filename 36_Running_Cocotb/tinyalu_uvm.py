@@ -5,11 +5,9 @@
 
 # In[1]:
 
-
-from pyuvm import *
 from tb_pkg import *
-import random
-import time
+from pyuvm import *
+
 
 class AluSeqItem(uvm_sequence_item):
 
@@ -47,11 +45,12 @@ class Driver(uvm_driver):
     def run_phase(self):
         while not ObjectionHandler().run_phase_complete():
             command = self.seq_item_port.get_next_item()
-            self.bfm.send_op(command)
-            self.logger.debug(f"Sending command: {command}")
+            self.bfm.send_op(command.A, command.B, command.op)
+            self.logger.debug(f"Sent command: {command}")
             time.sleep(0.5)
             self.seq_item_port.item_done()
-            
+
+
 class Coverage(uvm_subscriber):
     
     def end_of_elaboration_phase(self):
@@ -64,6 +63,7 @@ class Coverage(uvm_subscriber):
     def check_phase(self):
         if len(set(Ops) - self.cvg) > 0:
             self.logger.error(f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
+
 
 class Scoreboard(uvm_component):  
 
@@ -87,29 +87,31 @@ class Scoreboard(uvm_component):
                 self.logger.critical(f"result {actual_result} had no command")
             else:
                 op = Ops(op_numb)
-                predicted_result = TinyAluTlm.alu_op(A, B, op)
+                predicted_result = TlmAluBfm.alu_op(A, B, op)
                 if predicted_result == actual_result:
                     self.logger.info(f"PASSED: 0x{A:02x} {op.name} 0x{B:02x} ="
                                      f" 0x{actual_result:04x}")
                 else:
                     self.logger.error(f"FAILED: 0x{A:02x} {op.name} 0x{B:02x} "
-                                      f"= 0x{actual_result:04x} expected 0x{predicted_result:04x}")     
-                
+                                      f"= 0x{actual_result:04x} expected 0x{predicted_result:04x}")
+
+
 class Monitor(uvm_component):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
         self.method_name = method_name
     
     def build_phase(self):
-        self.dut = self.cdb_get("BFM")
+        self.bfm = self.cdb_get("BFM")
         self.ap = uvm_analysis_port("ap", self)
 
     def run_phase(self):
         while not ObjectionHandler().run_phase_complete():
-            get_method = getattr(self.dut, self.method_name)
+            get_method = getattr(self.bfm, self.method_name)
             datum = get_method()
             self.ap.write(datum)    
-            
+
+
 class AluEnv(uvm_env):
 
     def build_phase(self):
@@ -118,7 +120,7 @@ class AluEnv(uvm_env):
         self.scoreboard = Scoreboard("scoreboard", self)
         self.coverage = Coverage("coverage", self)
         self.driver = Driver("driver", self)
-        self.seqr  = uvm_sequencer("seqr", self)
+        self.seqr = uvm_sequencer("seqr", self)
         ConfigDB().set(None, "*", "SEQR", self.seqr)
         ConfigDB().set(None, "*", "CVG", self.coverage)
         
@@ -127,25 +129,52 @@ class AluEnv(uvm_env):
         self.cmd_mon.ap.connect(self.coverage)
         self.rslt_mon.ap.connect(self.scoreboard.rslt_export)
         self.driver.seq_item_port.connect(self.seqr.seq_item_export)
-        
 
-class AluTest(uvm_test):
+
+class TlmAluEnv(AluEnv):
     def build_phase(self):
-        self.env = AluEnv("env", self)
-        self.dut = self.cdb_get("BFM")
+        super().build_phase()
+        self.bfm = TlmAluBfm("BFM", self)
+        ConfigDB().set(None, "*", "BFM", self.bfm)
+
+
+class CocotbAluEnv(AluEnv):
+    def build_phase(self):
+        super().build_phase()
+        self.bfm = self.cdb_get("BFM")
+
+
+class BaseTest(uvm_test):
+    def build_phase(self):
+        self.env = AluEnv.create("env", self)
 
     def run_phase(self):
         self.raise_objection()
-        seqr = self.cdb_get("SEQR")
+        seqr = ConfigDB().get(self, "", "SEQR")
         seq = AluSeq("seq")
         seq.start(seqr)
         time.sleep(1)
         self.drop_objection()
 
-    def final_phase(self):
-        self.dut.done.set()
-        
     def end_of_elaboration_phase(self):
         self.set_logging_level_hier(logging.DEBUG)
 
+
+class TlmTest(BaseTest):
+    def build_phase(self):
+        uvm_factory().set_type_override_by_type(AluEnv, TlmAluEnv)
+        super().build_phase()
+
+
+class CocotbTest(BaseTest):
+    def build_phase(self):
+        uvm_factory().set_type_override_by_type(AluEnv, CocotbAluEnv)
+        super().build_phase()
+
+    def final_phase(self):
+        bfm = self.cdb_get("BFM")
+        bfm.done.set()
+
+if __name__ == "__main__":
+    uvm_root().run_test("TlmTest")
 

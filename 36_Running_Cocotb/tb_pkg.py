@@ -1,5 +1,6 @@
 import enum
 from pyuvm import *
+import random
 
 @enum.unique
 class Ops(enum.IntEnum):
@@ -41,10 +42,12 @@ class AluResult(uvm_transaction):
 
     def __eq__(self, other):
         return self.result == other.result
-    
-class TinyAluTlm(uvm_component):
+
+
+class TlmAluBfm(uvm_component):
     @staticmethod
     def alu_op(A, B, op):
+        result = None # Make the linter happy
         assert op in list(Ops), "The tinyalu op must be of type ops"
         if op == Ops.ADD:
             result = A + B
@@ -62,6 +65,7 @@ class TinyAluTlm(uvm_component):
         self.stim_f = uvm_tlm_fifo("stim_f", self)
         self.cmd_f = uvm_tlm_analysis_fifo("cmd_f", self)
         self.result_f = uvm_tlm_analysis_fifo("result_f", self)
+        ConfigDB().set(None, "*", "BFM", self)
         
         # The Stimulus Ports (for send_op())
         self.stim_put = uvm_put_port("stim_put", self)
@@ -85,8 +89,8 @@ class TinyAluTlm(uvm_component):
         self.result_put.connect(self.result_f.put_export)
         self.result_get.connect(self.result_f.get_export)
 
-    def send_op(self, op):
-        self.stim_put.put(op)
+    def send_op(self, aa, bb, op):
+        self.stim_put.put((aa, bb, op))
     
     def get_cmd(self):
         cmd  = self.cmd_get.get()
@@ -98,9 +102,9 @@ class TinyAluTlm(uvm_component):
         
     def run_phase(self):
         while True:
-            cmd = self.stim_get.get()
-            result = self.alu_op(cmd.A, cmd.B, cmd.op)
+            (aa, bb, op) = self.stim_get.get()
+            result = self.alu_op(aa, bb, op)
             result_txn = AluResult("result_txn", result)
-            self.cmd_put.put(cmd)
-            self.result_put.put(result_txn)
+            self.cmd_put.put((aa, bb, op))
+            self.result_put.put(result)
             

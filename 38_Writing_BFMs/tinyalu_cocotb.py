@@ -1,5 +1,5 @@
 from cocotb.clock import Clock
-from cocotb.triggers import FallingEdge, RisingEdge
+from cocotb.triggers import FallingEdge
 from cocotb.result import *
 import cocotb
 from pyuvm import *
@@ -18,18 +18,10 @@ class AluBfm:
         self.driver_queue.put((aa, bb, op))
 
     def get_cmd(self):
-        try:
-            cmd = self.cmd_mon_queue.get_nowait()
-        except queue.Empty:
-            cmd = None
-        return cmd
+        return self.cmd_mon_queue.get()
 
     def get_result(self):
-        try:
-            result = self.result_mon_queue.get_nowait()
-        except queue.Empty:
-            result = None
-        return result
+        return self.result_mon_queue.get()
 
     async def reset(self):
         await FallingEdge(self.dut.clk)
@@ -40,12 +32,6 @@ class AluBfm:
         await FallingEdge(self.dut.clk)
         self.dut.reset_n = 1
         await FallingEdge(self.dut.clk)
-
-    async def start(self):
-        cocotb.fork(self.driver_bfm())
-        cocotb.fork(self.cmd_mon_bfm())
-        cocotb.fork(self.result_mon_bfm())
-        pass
 
     async def driver_bfm(self):
         self.dut.start = self.dut.A = self.dut.B = 0
@@ -92,35 +78,32 @@ class AluBfm:
             prev_done = done
 
 
-def raise_objection():
-    uvm_root().raise_objection()
-
-
-def drop_objection():
-    root = uvm_root()
-    root.drop_objection()
 
 async def sleep():
     time.sleep(3)
+
+
 # noinspection PyArgumentList
 @cocotb.test()
 async def test_alu(dut):
-    raise_objection()
+    uvm_root().raise_objection()
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
     bfm = AluBfm(dut, "BFM")
     await bfm.reset()
-    cocotb.fork(bfm.start())
+    cocotb.fork(bfm.driver_bfm())
+    cocotb.fork(bfm.cmd_mon_bfm())
+    cocotb.fork(bfm.result_mon_bfm())
     await FallingEdge(dut.clk)
     await bfm.send_op(0xAA, 0x55, 1)
     await cocotb.triggers.ClockCycles(dut.clk, 5)
     cmd = bfm.get_cmd()
     result = bfm.get_result()
-    print("cmd:",cmd)
+    print("cmd:", cmd)
     print("result:", result)
     if result != 0xFF:
-        drop_objection()
-        raise TestFailure (f"ERROR: Bad answer {result:x} should be 0xFF")
+        uvm_root().drop_objection()
+        raise TestFailure(f"ERROR: Bad answer {result:x} should be 0xFF")
     else:
-        drop_objection()
+        uvm_root().drop_objection()
         raise TestSuccess
