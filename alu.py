@@ -85,7 +85,7 @@ class AluAgent(uvm_agent):
 
     def connect_phase(self):
         self.cmd_export  = self.scoreboard.cmd_export
-        self.rslt_export = self.scoreboard.rslt_export
+        self.rslt_export = self.scoreboard.result_export
         self.cvg_export = self.coverage
 
 class AluEnv(uvm_env):
