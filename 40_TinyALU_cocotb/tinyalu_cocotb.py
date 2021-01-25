@@ -1,11 +1,10 @@
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge
-from cocotb.result import *
 import cocotb
-from pyuvm import *
+from tinyalu_uvm import *
 
 
-class AluBfm:
+class RtlProxy:
     def __init__(self, dut, label):
         self.dut = dut
         ConfigDB().set(None, "*", label, self)
@@ -14,7 +13,7 @@ class AluBfm:
         self.result_mon_queue = UVMQueue(maxsize=0)
         self.done = cocotb.triggers.Event(name="Done")
 
-    async def send_op(self, aa, bb, op):
+    def send_op(self, aa, bb, op):
         self.driver_queue.put((aa, bb, op))
 
     def get_cmd(self):
@@ -74,9 +73,13 @@ class AluBfm:
                 done = 0
 
             if done == 1 and prev_done == 0:
-                self.result_mon_queue.put_nowait(int(self.dut.result))
+                self.result_mon_queue.put_nowait(int(self.dut.result.value))
             prev_done = done
 
+
+def run_uvm_test(test_name):
+    root = uvm_root()
+    root.run_test(test_name)
 
 
 async def sleep():
@@ -86,24 +89,17 @@ async def sleep():
 # noinspection PyArgumentList
 @cocotb.test()
 async def test_alu(dut):
-    uvm_root().raise_objection()
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
-    bfm = AluBfm(dut, "BFM")
+    bfm = RtlProxy(dut, "PROXY")
     await bfm.reset()
     cocotb.fork(bfm.driver_bfm())
     cocotb.fork(bfm.cmd_mon_bfm())
     cocotb.fork(bfm.result_mon_bfm())
     await FallingEdge(dut.clk)
-    await bfm.send_op(0xAA, 0x55, 1)
-    await cocotb.triggers.ClockCycles(dut.clk, 5)
-    cmd = bfm.get_cmd()
-    result = bfm.get_result()
-    print("cmd:", cmd)
-    print("result:", result)
-    if result != 0xFF:
-        uvm_root().drop_objection()
-        raise TestFailure(f"ERROR: Bad answer {result:x} should be 0xFF")
-    else:
-        uvm_root().drop_objection()
-        raise TestSuccess
+    test_thread = threading.Thread(target=run_uvm_test, args=("CocotbTest",), name="run_test")
+    test_thread.start()
+    await bfm.done.wait()
+    await FallingEdge(dut.clk)
+
+

@@ -44,7 +44,7 @@ class AluResult(uvm_transaction):
         return self.result == other.result
 
 
-class TlmAluBfm(uvm_component):
+class ModelProxy(uvm_component):
     @staticmethod
     def alu_op(A, B, op):
         result = None # Make the linter happy
@@ -65,7 +65,7 @@ class TlmAluBfm(uvm_component):
         self.stim_f = uvm_tlm_fifo("stim_f", self)
         self.cmd_f = uvm_tlm_analysis_fifo("cmd_f", self)
         self.result_f = uvm_tlm_analysis_fifo("result_f", self)
-        ConfigDB().set(None, "*", "BFM", self)
+        ConfigDB().set(None, "*", "PROXY", self)
         
         # The Stimulus Ports (for send_op())
         self.stim_put = uvm_put_port("stim_put", self)
@@ -104,7 +104,6 @@ class TlmAluBfm(uvm_component):
         while True:
             (aa, bb, op) = self.stim_get.get()
             result = self.alu_op(aa, bb, op)
-            result_txn = AluResult("result_txn", result)
             self.cmd_put.put((aa, bb, op))
             self.result_put.put(result)
             

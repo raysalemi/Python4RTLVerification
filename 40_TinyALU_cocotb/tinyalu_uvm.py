@@ -32,21 +32,22 @@ class AluSeqItem(uvm_sequence_item):
 
 class AluSeq(uvm_sequence):
     def body(self):
-        for _ in range(5):
+        for op in list(Ops):
             cmd_tr = AluSeqItem("cmd_tr")
             self.start_item(cmd_tr) 
             cmd_tr.randomize()
+            cmd_tr.op = op
             self.finish_item(cmd_tr) 
             
 
 class Driver(uvm_driver):
-    def build_phase(self):
-        self.bfm = self.cdb_get("BFM")
+    def connect_phase(self):
+        self.proxy = self.cdb_get("PROXY")
 
     def run_phase(self):
         while not ObjectionHandler().run_phase_complete():
             command = self.seq_item_port.get_next_item()
-            self.bfm.send_op(command.A, command.B, command.op)
+            self.proxy.send_op(command.A, command.B, command.op)
             self.logger.debug(f"Sent command: {command}")
             time.sleep(0.5)
             self.seq_item_port.item_done()
@@ -88,7 +89,7 @@ class Scoreboard(uvm_component):
                 self.logger.critical(f"result {actual_result} had no command")
             else:
                 op = Ops(op_numb)
-                predicted_result = TlmAluBfm.alu_op(A, B, op)
+                predicted_result = ModelProxy.alu_op(A, B, op)
                 if predicted_result == actual_result:
                     self.logger.info(f"PASSED: 0x{A:02x} {op.name} 0x{B:02x} ="
                                      f" 0x{actual_result:04x}")
@@ -103,12 +104,14 @@ class Monitor(uvm_component):
         self.method_name = method_name
     
     def build_phase(self):
-        self.bfm = self.cdb_get("BFM")
         self.ap = uvm_analysis_port("ap", self)
+
+    def connect_phase(self):
+        self.proxy = self.cdb_get("PROXY")
 
     def run_phase(self):
         while not ObjectionHandler().run_phase_complete():
-            get_method = getattr(self.bfm, self.method_name)
+            get_method = getattr(self.proxy, self.method_name)
             datum = get_method()
             self.ap.write(datum)    
 
@@ -132,18 +135,6 @@ class AluEnv(uvm_env):
         self.driver.seq_item_port.connect(self.seqr.seq_item_export)
 
 
-class TlmAluEnv(AluEnv):
-    def build_phase(self):
-        super().build_phase()
-        self.bfm = TlmAluBfm("BFM", self)
-        ConfigDB().set(None, "*", "BFM", self.bfm)
-
-
-class CocotbAluEnv(AluEnv):
-    def build_phase(self):
-        super().build_phase()
-        self.bfm = self.cdb_get("BFM")
-
 
 class BaseTest(uvm_test):
     def build_phase(self):
@@ -163,18 +154,16 @@ class BaseTest(uvm_test):
 
 class TlmTest(BaseTest):
     def build_phase(self):
-        uvm_factory().set_type_override_by_type(AluEnv, TlmAluEnv)
+        model_proxy = ModelProxy("model_proxy", self)
+        ConfigDB().set(None, "*", "PROXY", model_proxy)
         super().build_phase()
 
 
 class CocotbTest(BaseTest):
-    def build_phase(self):
-        uvm_factory().set_type_override_by_type(AluEnv, CocotbAluEnv)
-        super().build_phase()
 
     def final_phase(self):
-        bfm = self.cdb_get("BFM")
-        bfm.done.set()
+        rtl_proxy = self.cdb_get("PROXY")
+        rtl_proxy.done.set()
 
 
 if __name__ == "__main__":
