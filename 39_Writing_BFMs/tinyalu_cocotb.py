@@ -5,7 +5,7 @@ import cocotb
 from pyuvm import *
 
 
-class RtlProxy:
+class CocotbProxy:
     def __init__(self, dut, label):
         self.dut = dut
         ConfigDB().set(None, "*", label, self)
@@ -89,16 +89,16 @@ async def test_alu(dut):
     uvm_root().raise_objection()
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
-    bfm = RtlProxy(dut, "PROXY")
-    await bfm.reset()
-    cocotb.fork(bfm.driver_bfm())
-    cocotb.fork(bfm.cmd_mon_bfm())
-    cocotb.fork(bfm.result_mon_bfm())
+    proxy = CocotbProxy(dut, "PROXY")
+    await proxy.reset()
+    cocotb.fork(proxy.driver_bfm())
+    cocotb.fork(proxy.cmd_mon_bfm())
+    cocotb.fork(proxy.result_mon_bfm())
     await FallingEdge(dut.clk)
-    await bfm.send_op(0xAA, 0x55, 1)
+    await proxy.send_op(0xAA, 0x55, 1)
     await cocotb.triggers.ClockCycles(dut.clk, 5)
-    cmd = bfm.get_cmd()
-    result = bfm.get_result()
+    cmd = proxy.get_cmd()
+    result = proxy.get_result()
     print("cmd:", cmd)
     print("result:", result)
     if result != 0xFF:

@@ -44,7 +44,7 @@ class AluResult(uvm_transaction):
         return self.result == other.result
 
 
-class ModelProxy(uvm_component):
+class PythonProxy(uvm_component):
     @staticmethod
     def alu_op(A, B, op):
         result = None # Make the linter happy

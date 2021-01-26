@@ -4,7 +4,7 @@ import cocotb
 from tinyalu_uvm import *
 
 
-class RtlProxy:
+class CocotbProxy:
     def __init__(self, dut, label):
         self.dut = dut
         ConfigDB().set(None, "*", label, self)
@@ -91,15 +91,15 @@ async def sleep():
 async def test_alu(dut):
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
-    bfm = RtlProxy(dut, "PROXY")
-    await bfm.reset()
-    cocotb.fork(bfm.driver_bfm())
-    cocotb.fork(bfm.cmd_mon_bfm())
-    cocotb.fork(bfm.result_mon_bfm())
+    proxy = CocotbProxy(dut, "PROXY")
+    await proxy.reset()
+    cocotb.fork(proxy.driver_bfm())
+    cocotb.fork(proxy.cmd_mon_bfm())
+    cocotb.fork(proxy.result_mon_bfm())
     await FallingEdge(dut.clk)
-    test_thread = threading.Thread(target=run_uvm_test, args=("CocotbTest",), name="run_test")
+    test_thread = threading.Thread(target=run_uvm_test, args=("CocotbAluTest",), name="run_test")
     test_thread.start()
-    await bfm.done.wait()
+    await proxy.done.wait()
     await FallingEdge(dut.clk)
 
 

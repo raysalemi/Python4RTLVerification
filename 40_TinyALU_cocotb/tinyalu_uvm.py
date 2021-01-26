@@ -89,7 +89,7 @@ class Scoreboard(uvm_component):
                 self.logger.critical(f"result {actual_result} had no command")
             else:
                 op = Ops(op_numb)
-                predicted_result = ModelProxy.alu_op(A, B, op)
+                predicted_result = PythonProxy.alu_op(A, B, op)
                 if predicted_result == actual_result:
                     self.logger.info(f"PASSED: 0x{A:02x} {op.name} 0x{B:02x} ="
                                      f" 0x{actual_result:04x}")
@@ -136,7 +136,7 @@ class AluEnv(uvm_env):
 
 
 
-class BaseTest(uvm_test):
+class AluTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv.create("env", self)
 
@@ -152,14 +152,14 @@ class BaseTest(uvm_test):
         self.set_logging_level_hier(logging.DEBUG)
 
 
-class TlmTest(BaseTest):
+class PythonAluTest(AluTest):
     def build_phase(self):
-        model_proxy = ModelProxy("model_proxy", self)
+        model_proxy = PythonProxy("model_proxy", self)
         ConfigDB().set(None, "*", "PROXY", model_proxy)
         super().build_phase()
 
 
-class CocotbTest(BaseTest):
+class CocotbAluTest(AluTest):
 
     def final_phase(self):
         rtl_proxy = self.cdb_get("PROXY")
@@ -167,4 +167,4 @@ class CocotbTest(BaseTest):
 
 
 if __name__ == "__main__":
-    uvm_root().run_test("TlmTest")
+    uvm_root().run_test("PythonAluTest")
