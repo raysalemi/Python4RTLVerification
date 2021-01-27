@@ -12,7 +12,6 @@ class CocotbProxy:
         self.driver_queue = UVMQueue(maxsize=1)
         self.cmd_mon_queue = UVMQueue(maxsize=0)
         self.result_mon_queue = UVMQueue(maxsize=0)
-        self.done = cocotb.triggers.Event(name="Done")
 
     async def send_op(self, aa, bb, op):
         self.driver_queue.put((aa, bb, op))

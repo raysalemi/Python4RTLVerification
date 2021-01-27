@@ -162,8 +162,8 @@ class PythonAluTest(AluTest):
 class CocotbAluTest(AluTest):
 
     def final_phase(self):
-        rtl_proxy = self.cdb_get("PROXY")
-        rtl_proxy.done.set()
+        cocotb_proxy = self.cdb_get("PROXY")
+        cocotb_proxy.done.set()
 
 
 if __name__ == "__main__":
