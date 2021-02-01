@@ -154,8 +154,7 @@ class AluTest(uvm_test):
 
 class PythonAluTest(AluTest):
     def build_phase(self):
-        model_proxy = PythonProxy("model_proxy", self)
-        ConfigDB().set(None, "*", "PROXY", model_proxy)
+        _ = PythonProxy("model_proxy", self, "PROXY")
         super().build_phase()
 
 

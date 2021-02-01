@@ -45,6 +45,9 @@ class AluResult(uvm_transaction):
 
 
 class PythonProxy(uvm_component):
+    def __init__(self, name, parent, label):
+        super().__init__(name, parent)
+        ConfigDB().set(None, "*", label, self)
     @staticmethod
     def alu_op(A, B, op):
         result = None # Make the linter happy
