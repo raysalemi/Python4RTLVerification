@@ -1,11 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # The TinyALU TLM Testbench
-
-# In[1]:
-
-from tb_pkg import *
+from PythonProxy import *
 from pyuvm import *
 
 
@@ -154,7 +147,8 @@ class AluTest(uvm_test):
 
 class PythonAluTest(AluTest):
     def build_phase(self):
-        _ = PythonProxy("model_proxy", self, "PROXY")
+        proxy = PythonProxy("model_proxy", self)
+        ConfigDB().set(None, "*", "PROXY", proxy)
         super().build_phase()
 
 

@@ -6,12 +6,12 @@ from pyuvm import *
 
 
 class CocotbProxy:
-    def __init__(self, dut, label):
+    def __init__(self, dut):
         self.dut = dut
-        ConfigDB().set(None, "*", label, self)
         self.driver_queue = UVMQueue(maxsize=1)
         self.cmd_mon_queue = UVMQueue(maxsize=0)
         self.result_mon_queue = UVMQueue(maxsize=0)
+        self.done = cocotb.triggers.Event(name="Done")
 
     async def send_op(self, aa, bb, op):
         self.driver_queue.put((aa, bb, op))
@@ -35,12 +35,11 @@ class CocotbProxy:
     async def driver_bfm(self):
         self.dut.start = self.dut.A = self.dut.B = 0
         self.dut.op = 0
-        while True:
+        while  not ObjectionHandler().run_phase_complete():
             await FallingEdge(self.dut.clk)
             if self.dut.start == 0 and self.dut.done == 0:
                 try:
                     (aa, bb, op) = self.driver_queue.get_nowait()
-                    time.sleep(0.1)
                     self.dut.A = aa
                     self.dut.B = bb
                     self.dut.op = op
@@ -53,7 +52,7 @@ class CocotbProxy:
 
     async def cmd_mon_bfm(self):
         prev_start = 0
-        while True:
+        while not ObjectionHandler().run_phase_complete():
             await FallingEdge(self.dut.clk)
             try:
                 start = int(self.dut.start.value)
@@ -65,7 +64,7 @@ class CocotbProxy:
 
     async def result_mon_bfm(self):
         prev_done = 0
-        while True:
+        while not ObjectionHandler().run_phase_complete():
             await FallingEdge(self.dut.clk)
             try:
                 done = int(self.dut.done)
@@ -88,7 +87,8 @@ async def test_alu(dut):
     uvm_root().raise_objection()
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
-    proxy = CocotbProxy(dut, "PROXY")
+    proxy = CocotbProxy(dut)
+    ConfigDB().set(None, "*", "PROXY", proxy)
     await proxy.reset()
     cocotb.fork(proxy.driver_bfm())
     cocotb.fork(proxy.cmd_mon_bfm())
