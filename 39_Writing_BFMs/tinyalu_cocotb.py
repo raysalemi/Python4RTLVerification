@@ -2,16 +2,14 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge
 from cocotb.result import *
 import cocotb
-from pyuvm import *
-
+import queue
 
 class CocotbProxy:
     def __init__(self, dut):
         self.dut = dut
-        self.driver_queue = UVMQueue(maxsize=1)
-        self.cmd_mon_queue = UVMQueue(maxsize=0)
-        self.result_mon_queue = UVMQueue(maxsize=0)
-        self.done = cocotb.triggers.Event(name="Done")
+        self.driver_queue = queue.Queue(maxsize=1)
+        self.cmd_mon_queue = queue.Queue(maxsize=0)
+        self.result_mon_queue = queue.Queue(maxsize=0)
 
     async def send_op(self, aa, bb, op):
         self.driver_queue.put((aa, bb, op))
@@ -35,7 +33,7 @@ class CocotbProxy:
     async def driver_bfm(self):
         self.dut.start = self.dut.A = self.dut.B = 0
         self.dut.op = 0
-        while  not ObjectionHandler().run_phase_complete():
+        while  True:
             await FallingEdge(self.dut.clk)
             if self.dut.start == 0 and self.dut.done == 0:
                 try:
@@ -52,7 +50,7 @@ class CocotbProxy:
 
     async def cmd_mon_bfm(self):
         prev_start = 0
-        while not ObjectionHandler().run_phase_complete():
+        while True:
             await FallingEdge(self.dut.clk)
             try:
                 start = int(self.dut.start.value)
@@ -64,7 +62,7 @@ class CocotbProxy:
 
     async def result_mon_bfm(self):
         prev_done = 0
-        while not ObjectionHandler().run_phase_complete():
+        while True:
             await FallingEdge(self.dut.clk)
             try:
                 done = int(self.dut.done)
@@ -84,11 +82,9 @@ async def sleep():
 # noinspection PyArgumentList
 @cocotb.test()
 async def test_alu(dut):
-    uvm_root().raise_objection()
     clock = Clock(dut.clk, 2, units="us")
     cocotb.fork(clock.start())
     proxy = CocotbProxy(dut)
-    ConfigDB().set(None, "*", "PROXY", proxy)
     await proxy.reset()
     cocotb.fork(proxy.driver_bfm())
     cocotb.fork(proxy.cmd_mon_bfm())
@@ -101,8 +97,6 @@ async def test_alu(dut):
     print("cmd:", cmd)
     print("result:", result)
     if result != 0xFF:
-        uvm_root().drop_objection()
         raise TestFailure(f"ERROR: Bad answer {result:x} should be 0xFF")
     else:
-        uvm_root().drop_objection()
         raise TestSuccess
