@@ -4,6 +4,12 @@ SIM ?= icarus
 VERILOG_SOURCES =$(CWD)/hdl/verilog/tinyalu.sv
 MODULE := tinyalu_cocotb
 TOPLEVEL := tinyalu
+TOPLEVEL_LANG := verilog
 COCOTB_HDL_TIMEUNIT=1us
 COCOTB_HDL_TIMEPRECISION=1us
 include $(shell cocotb-config --makefiles)/Makefile.sim
+
+
+cleanall: clean
+	@rm -rf __pycache__
+	@rm -f results.xml

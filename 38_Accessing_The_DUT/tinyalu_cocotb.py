@@ -3,7 +3,6 @@ from cocotb.triggers import FallingEdge, RisingEdge
 import cocotb
 
 
-
 async def reset(dut):
     await FallingEdge(dut.clk)
     dut.reset_n = 0

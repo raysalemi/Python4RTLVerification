@@ -3,3 +3,5 @@ __pycache__
 .ipynb_checkpoints
 scratch.ipynb
 *.json
+results.xml
+sim_build
