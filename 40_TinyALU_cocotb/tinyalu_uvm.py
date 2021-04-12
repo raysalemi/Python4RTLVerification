@@ -1,4 +1,4 @@
-from PythonProxy import *
+from proxy_pkg import *
 from pyuvm import *
 
 
