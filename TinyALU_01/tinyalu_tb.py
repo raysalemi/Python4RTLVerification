@@ -61,7 +61,7 @@ async def alu_test(dut):
         if st == 1 and dn == 1:
             dut.start = 0
             result = int(dut.result.value)
-            pr = alu_prediction(aa, bb, op, error=True)
+            pr = alu_prediction(aa, bb, op, error=False)
             if result == pr:
                 logger.info(f"PASSED: {aa} {op} {bb} = {result}")
             else:
