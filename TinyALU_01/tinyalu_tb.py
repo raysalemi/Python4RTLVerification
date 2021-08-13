@@ -32,32 +32,47 @@ def alu_prediction(A, B, op, error = False):
 
 @cocotb.test()
 async def alu_test(dut):
+    passed = True
     logging.basicConfig(level=logging.NOTSET)
     logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
     cvg = set() #functional coverage
     await FallingEdge(dut.clk)
     dut.reset_n = 0
+    dut.start = 0
     await FallingEdge(dut.clk)
     dut.reset_n = 1
-
-    for _ in range(3):
-
-        aa = random.randrange(256)
-        bb = random.randrange(256)
-        op = random.choice(list(Ops))
-        cvg.add(op)
-        dut.A = aa
-        dut.B = bb
-        dut.op = int(op)
-        dut.start = 1
+    ops = list(Ops)
+    while True:
         await FallingEdge(dut.clk)
-        await RisingEdge(dut.done)
-        actual_result = int(dut.result.value)
-        dut.start = 0
-        predicted_result = alu_prediction(aa, bb, op, error = True)
-        if predicted_result == actual_result:
-            logger.info (f"PASSED:  {aa:02x} {op.name} {bb:02x} = {actual_result:04x}")
-        else:
-            logger.error (f"FAILED: {aa:02x} {op.name} {bb:02x} = {actual_result:04x} expected {predicted_result:04x}")
-    if len(set(Ops) - cvg) > 0:
-        logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
+        st = int(dut.start.value)
+        dn = int(dut.done.value)
+        if st == 0 and dn == 0:
+            aa = random.randint(0, 255)
+            bb = random.randint(0, 255)
+            op = ops.pop()
+            cvg.add(op)
+            dut.A = aa
+            dut.B = bb
+            dut.op = int(op)
+            dut.start = 1
+        if st == 1 and dn == 0 or st == 0 and dn == 1:
+            continue
+        if st == 1 and dn == 1:
+            dut.start = 0
+            result = int(dut.result.value)
+            pr = alu_prediction(aa, bb, op, error=True)
+            if result == pr:
+                logger.info(f"PASSED: {aa} {op} {bb} = {result}")
+            else:
+                logger.error(f"FAILED: {aa} {op} {bb} = {result} - predicted {pr}")
+                passed = False
+        if len(ops) == 0:
+            if len(set(Ops) - cvg) > 0: 
+                logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
+            else:
+                logger.info("Covered all operations")
+            break
+    assert passed
+
+
