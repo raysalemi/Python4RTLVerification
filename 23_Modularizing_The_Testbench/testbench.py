@@ -76,6 +76,7 @@ async def modular(dut):
     Demonstrates using components to modularize the testbench
     """
     bfm = TinyAluBfm(dut)
+    await bfm.startup_bfms()
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("AluTest")
     assert True

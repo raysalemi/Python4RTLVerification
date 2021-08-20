@@ -3,6 +3,7 @@ from pyuvm import *
 from tinyalu_utils import Ops, alu_prediction, TinyAluBfm
 import random
 
+
 class BaseEnv(uvm_env):
     async def set_up_sim(self):
         cocotb.fork(self.bfm.driver_bfm())
@@ -22,6 +23,7 @@ class BaseEnv(uvm_env):
     def check_phase(self):
         if len(self.missed_ops) > 0:
             self.logger.warning(f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
+
 
 class RandomEnv(BaseEnv):
     async def run_phase(self):
@@ -81,6 +83,7 @@ async def max_env(dut):
     Demonstrates using an environment to run a different test
     """
     bfm = TinyAluBfm(dut)
+    await bfm.startup_bfms()
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("MaxTest")
     assert True

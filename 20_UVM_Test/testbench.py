@@ -16,6 +16,7 @@ debugpy.wait_for_client()
 breakpoint()  # or debugpy.breakpoint() on 3.6 and below
 """
 
+
 class HelloWorldTest(uvm_test):
     async def run_phase(self):
         self.raise_objection()
@@ -25,18 +26,11 @@ class HelloWorldTest(uvm_test):
 
 class AluTest(uvm_test):
 
-    async def set_up_sim(self):
-        cocotb.fork(self.bfm.driver_bfm())
-        cocotb.fork(self.bfm.result_mon_bfm())
-        cocotb.fork(self.bfm.cmd_mon_bfm())
-        await self.bfm.reset()
-
     def build_phase(self):
         self.bfm = ConfigDB().get(self, "", "BFM")
 
     async def run_phase(self):
         self.raise_objection()   # You MUST raise an objection
-        await self.set_up_sim()
         passed = True
         cvg = set()  # functional coverage
         for op in list(Ops):
@@ -78,5 +72,6 @@ async def alu_test(dut):
     Run ALU test
     """
     bfm = TinyAluBfm(dut)
+    await bfm.startup_bfms()
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("AluTest")
