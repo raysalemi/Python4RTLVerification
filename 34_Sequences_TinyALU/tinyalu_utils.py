@@ -1,25 +1,41 @@
 from cocotb.triggers import FallingEdge
+from cocotb.queue import QueueEmpty, Queue
 import cocotb
-from cocotb.queue import QueueEmpty
-from tinyalu_uvm import *
-"""
-import debugpy
-listen_host, listen_port = debugpy.listen(("localhost", 5678))
-cocotb.log.info("Waiting for Python debugger attach"
-" on {}:{}".format(listen_host, listen_port))
-# Suspend execution until debugger attaches
-debugpy.wait_for_client()
-# Break into debugger for user control
-breakpoint()  # or debugpy.breakpoint() on 3.6 and below
-"""
+import enum
+import random
 
 
-class CocotbProxy:
+@enum.unique
+class Ops(enum.IntEnum):
+    """Legal ops for the TinyALU"""
+    ADD = 1
+    AND = 2
+    XOR = 3
+    MUL = 4
+
+
+def alu_prediction(A, B, op, error=False):
+    """Python model of the TinyALU"""
+    assert isinstance(op, Ops), "The tinyalu op must be of type ops"
+    if op == Ops.ADD:
+        result = A + B
+    elif op == Ops.AND:
+        result = A & B
+    elif op == Ops.XOR:
+        result = A ^ B
+    elif op == Ops.MUL:
+        result = A * B
+    if error and (random.randint(0, 3) == 0):
+        result = result + 1
+    return result
+
+
+class TinyAluBfm:
     def __init__(self, dut):
         self.dut = dut
-        self.driver_queue = UVMQueue(maxsize=1)
-        self.cmd_mon_queue = UVMQueue(maxsize=0)
-        self.result_mon_queue = UVMQueue(maxsize=0)
+        self.driver_queue = Queue(maxsize=1)
+        self.cmd_mon_queue = Queue(maxsize=0)
+        self.result_mon_queue = Queue(maxsize=0)
 
     async def send_op(self, aa, bb, op):
         await self.driver_queue.put((aa, bb, op))
@@ -90,14 +106,8 @@ class CocotbProxy:
                 self.result_mon_queue.put_nowait(result)
             prev_done = done
 
-
-@cocotb.test()
-async def test_alu(dut):
-    proxy = CocotbProxy(dut)
-    ConfigDB().set(None, "*", "PROXY", proxy)
-    ConfigDB().set(None, "*", "DUT", dut)
-    await proxy.reset()
-    cocotb.fork(proxy.driver_bfm())
-    cocotb.fork(proxy.cmd_mon_bfm())
-    cocotb.fork(proxy.result_mon_bfm())
-    await uvm_root().run_test("AluTest")
+    async def startup_bfms(self):
+        await self.reset()
+        cocotb.fork(self.driver_bfm())
+        cocotb.fork(self.cmd_mon_bfm())
+        cocotb.fork(self.result_mon_bfm())
