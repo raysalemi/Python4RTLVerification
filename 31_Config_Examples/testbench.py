@@ -163,6 +163,3 @@ async def config_tracing(dut):
     """Demonstrate Config Tracing"""
     await uvm_root().run_test("TracingTest")
     assert True
-
-
-# 

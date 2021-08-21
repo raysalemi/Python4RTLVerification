@@ -39,29 +39,32 @@ async def phase_test(dut):
     await uvm_root().run_test("PhaseTest")
     assert True
 
+
 class BottomComp(uvm_component):
     async def run_phase(self):
         self.raise_objection()
-        self.logger.info(f"{self.get_name()} is running")   
+        self.logger.info(f"{self.get_name()} is running")
         self.drop_objection()
+
 
 class MiddleComp(uvm_component):
     def build_phase(self):
         self.bc = BottomComp(name="bc", parent=self)
-    
+
     def end_of_elaboration_phase(self):
         self.logger.info(f"{self.get_name()} is here")
-        
+
+
 class TopTest(uvm_test):
     def build_phase(self):
         self.mc = MiddleComp("mc", self)
-    
+
     def end_of_elaboration_phase(self):
         self.logger.info(f"{self.get_name()} is here")
 
 
 @cocotb.test()
-async def phase_test(dut):
+async def hierarchy_test(dut):
     """Create hierarchy"""
     await uvm_root().run_test("TopTest")
     assert True

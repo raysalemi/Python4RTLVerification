@@ -12,14 +12,14 @@ class BaseEnv(uvm_env):
         await self.bfm.reset()
 
     def build_phase(self):
-        self.bfm = ConfigDB().get(self, "", "BFM")    
+        self.bfm = ConfigDB().get(self, "", "BFM")
 
     def end_of_elaboration_phase(self):
         self.cvg = set()
-        
+
     def extract_phase(self):
         self.missed_ops = set(Ops) - self.cvg
-    
+
     def check_phase(self):
         if len(self.missed_ops) > 0:
             self.logger.warning(f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
@@ -27,7 +27,7 @@ class BaseEnv(uvm_env):
 
 class RandomEnv(BaseEnv):
     async def run_phase(self):
-        self.raise_objection() 
+        self.raise_objection()
         await self.set_up_sim()
         for op in list(Ops):
             A = random.randrange(256)
@@ -37,10 +37,11 @@ class RandomEnv(BaseEnv):
             await self.bfm.send_op(A, B, int(op))
             actual_result = await self.bfm.get_result()
             if predicted_result == actual_result:
-                self.logger.info( f"PASSED: {A:02x} {op.name} {B:02x} = {actual_result:04x}")
+                self.logger.info(f"PASSED: {A:02x} {op.name} {B:02x} = {actual_result:04x}")
             else:
                 self.logger.error(f"FAILED: {A:02x} {op.name} {B:02x} = {actual_result:04x} expected {predicted_result:04x}")
-        self.drop_objection()  ## drop the objection to end
+        self.drop_objection()  # drop the objection to end
+
 
 class MaxEnv(BaseEnv):
     async def run_phase(self):
@@ -54,18 +55,21 @@ class MaxEnv(BaseEnv):
             await self.bfm.send_op(A, B, int(op))
             actual_result = await self.bfm.get_result()
             if predicted_result == actual_result:
-                self.logger.info( f"PASSED: {A:02x} {op.name} {B:02x} = {actual_result:04x}")
+                self.logger.info(f"PASSED: {A:02x} {op.name} {B:02x} = {actual_result:04x}")
             else:
                 self.logger.error(f"FAILED: {A:02x} {op.name} {B:02x} = {actual_result:04x} expected {predicted_result:04x}")
         self.drop_objection()
+
 
 class RandomTest(uvm_test):
     def build_phase(self):
         self.env = RandomEnv("env", self)
 
+
 class MaxTest(uvm_test):
     def build_phase(self):
         self.env = MaxEnv("env", self)
+
 
 @cocotb.test()
 async def random_env(dut):
@@ -77,6 +81,7 @@ async def random_env(dut):
     await uvm_root().run_test("RandomTest")
     assert True
 
+
 @cocotb.test()
 async def max_env(dut):
     """
@@ -87,4 +92,3 @@ async def max_env(dut):
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("MaxTest")
     assert True
-

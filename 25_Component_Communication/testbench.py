@@ -212,7 +212,7 @@ class nb_get_test(uvm_test):
     def build_phase(self):
         self.nbgp = uvm_nonblocking_get_port("pp", self)
         self.nbex = example_nb_get_export("nbex", self)
-    
+
     def connect_phase(self):
         self.nbgp.connect(self.nbex)
 
