@@ -21,12 +21,9 @@ async def test_alu(dut):
     await FallingEdge(dut.clk)
     dut.A = 1
     dut.B = 2
-    dut.op = 1 #add
+    dut.op = 1  #add
     dut.start = 1
     await RisingEdge(dut.done)
     await FallingEdge(dut.clk)
     assert dut.result == 3, "Tinyalu Addition Failure"
-    print("*"*10, "TINYALU PASSED", "*"*10)
-
-
-
+    print("*" * 10, "TINYALU PASSED", "*" * 10)
