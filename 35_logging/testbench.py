@@ -82,12 +82,12 @@ class FileFIFOTest(uvm_test):
         self.prod = Producer("prod", self)
         self.cons = Consumer("cons", self)
         self.fifo = uvm_tlm_fifo("fifo", self)
-        
+
     def end_of_elaboration_phase(self):
         file_handler = logging.FileHandler("put.txt")
         self.add_logging_handler_hier(file_handler)
         self.set_logging_level_hier(FIFO_DEBUG)
-    
+
     def connect_phase(self):
         self.prod.pp.connect(self.fifo.put_export)
         self.cons.gp.connect(self.fifo.get_export)
