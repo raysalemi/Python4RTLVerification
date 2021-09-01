@@ -5,9 +5,14 @@
 		},
 		{
 			"path": "../pyuvm"
+		},
+		{
+			"path": "../tmp"
 		}
 	],
-	"settings": {},
+	"settings": {
+		"jupyter.jupyterServerType": "remote"
+	},
 	"launch": {
 		"version": "0.2.0",
 		"configurations": [
