@@ -1,6 +1,5 @@
 from cocotb.triggers import FallingEdge
 from cocotb.queue import QueueEmpty, Queue
-import cocotb
 import enum
 import random
 
@@ -68,6 +67,7 @@ class TinyAluBfm:
             if self.dut.start.value == 0 and self.dut.done.value == 0:
                 try:
                     (aa, bb, op) = self.driver_queue.get_nowait()
+                    print("Got ", (aa, bb, op))
                     self.dut.A = aa
                     self.dut.B = bb
                     self.dut.op = op
@@ -105,9 +105,3 @@ class TinyAluBfm:
                 result = int(self.dut.result)
                 self.result_mon_queue.put_nowait(result)
             prev_done = done
-
-    async def startup_bfms(self):
-        await self.reset()
-        cocotb.fork(self.driver_bfm())
-        cocotb.fork(self.cmd_mon_bfm())
-        cocotb.fork(self.result_mon_bfm())

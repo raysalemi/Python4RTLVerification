@@ -1,6 +1,7 @@
 module tinyalu (input [7:0] A,
 		input [7:0] B,
 		input [2:0] op,
+//		input clk,
 		input reset_n,
 		input start,
 		output done,
