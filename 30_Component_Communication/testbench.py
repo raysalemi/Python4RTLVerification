@@ -192,7 +192,7 @@ class port_test(uvm_test):
 
 @cocotb.test()
 async def error_checking(dut):
-    """Error Checking example"""
+    """Error Checking example that intentionally fails"""
     await uvm_root().run_test("port_test")
     assert True
 
