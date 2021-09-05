@@ -2,19 +2,7 @@ import cocotb
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction
 import random
 import logging
-import debugpy
 
-"""
-listen_host, listen_port = debugpy.listen(("localhost", 5678))
-print("LISTEN_HOST:", listen_host)
-print("LISTEN_PORT", listen_port)
-cocotb.log.info("Waiting for Python debugger attach"
-" on {}:{}".format(listen_host, listen_port))
-# Suspend execution until debugger attaches
-debugpy.wait_for_client()
-# Break into debugger for user control
-breakpoint()  # or debugpy.breakpoint() on 3.6 and below
-"""
 
 class Tester():
     def __init__(self, bfm, done):
@@ -43,7 +31,7 @@ class Scoreboard():
 
     async def get_cmds(self):
         while True:
-            op = await self.bfm.get_cmd() 
+            op = await self.bfm.get_cmd()
             self.ops.append(op)
             self.cvg.add(Ops(op[2]))
 
@@ -77,7 +65,6 @@ class Scoreboard():
             self.logger.info("Covered all operations")
 
         return passed
-
 
 
 @cocotb.test()

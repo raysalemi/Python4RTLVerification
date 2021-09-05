@@ -1,5 +1,5 @@
 import cocotb
-from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge
+from cocotb.triggers import FallingEdge
 import enum
 import random
 import logging
@@ -14,7 +14,7 @@ class Ops(enum.IntEnum):
     MUL = 4
 
 
-def alu_prediction(A, B, op, error = False):
+def alu_prediction(A, B, op, error=False):
     """Python model of the TinyALU"""
     assert isinstance(op, Ops), "The tinyalu op must be of type ops"
     if op == Ops.ADD:
@@ -25,7 +25,7 @@ def alu_prediction(A, B, op, error = False):
         result = A ^ B
     elif op == Ops.MUL:
         result = A * B
-    if error and (random.randint(0,3) == 0):
+    if error and (random.randint(0, 3) == 0):
         result = result + 1
     return result
 
@@ -36,7 +36,7 @@ async def alu_test(dut):
     logging.basicConfig(level=logging.NOTSET)
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
-    cvg = set() #functional coverage
+    cvg = set()  # functional coverage
     await FallingEdge(dut.clk)
     dut.reset_n = 0
     dut.start = 0
@@ -68,11 +68,9 @@ async def alu_test(dut):
                 logger.error(f"FAILED: {aa} {op} {bb} = {result} - predicted {pr}")
                 passed = False
         if len(ops) == 0:
-            if len(set(Ops) - cvg) > 0: 
+            if len(set(Ops) - cvg) > 0:
                 logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
             else:
                 logger.info("Covered all operations")
             break
     assert passed
-
-

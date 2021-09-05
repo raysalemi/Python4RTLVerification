@@ -3,6 +3,7 @@ from cocotb.queue import QueueEmpty, Queue
 import enum
 import random
 
+
 @enum.unique
 class Ops(enum.IntEnum):
     """Legal ops for the TinyALU"""
@@ -11,7 +12,8 @@ class Ops(enum.IntEnum):
     XOR = 3
     MUL = 4
 
-def alu_prediction(A, B, op, error = False):
+
+def alu_prediction(A, B, op, error=False):
     """Python model of the TinyALU"""
     assert isinstance(op, Ops), "The tinyalu op must be of type ops"
     if op == Ops.ADD:
@@ -22,9 +24,10 @@ def alu_prediction(A, B, op, error = False):
         result = A ^ B
     elif op == Ops.MUL:
         result = A * B
-    if error and (random.randint(0,3) == 0):
+    if error and (random.randint(0, 3) == 0):
         result = result + 1
     return result
+
 
 class TinyAluBfm:
     def __init__(self, dut):

@@ -1,5 +1,4 @@
 import cocotb
-from cocotb.queue import QueueEmpty
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction
 import random
 import logging
@@ -10,7 +9,7 @@ async def test_alu(dut):
     passed = True
     logging.basicConfig(level=logging.NOTSET)
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)    
+    logger.setLevel(logging.DEBUG)
     bfm = TinyAluBfm(dut)
     await bfm.reset()
     cocotb.fork(bfm.driver_bfm())
@@ -35,10 +34,9 @@ async def test_alu(dut):
             logger.error(f"FAILED: {aa} {op} {bb} = {result} - predicted {pr}")
             passed = False
         if len(ops) == 0:
-            if len(set(Ops) - cvg) > 0: 
+            if len(set(Ops) - cvg) > 0:
                 logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
             else:
                 logger.info("Covered all operations")
             break
-    assert passed        
-    
+    assert passed
