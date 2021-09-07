@@ -31,4 +31,3 @@ async def oops(dut):
     dut.reset_n = 0
     ClockCycles(dut.clk, 6)
     print("Did not await")
-
