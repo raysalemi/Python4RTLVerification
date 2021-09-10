@@ -12,9 +12,7 @@ async def test_alu(dut):
     logger.setLevel(logging.DEBUG)
     bfm = TinyAluBfm(dut)
     await bfm.reset()
-    cocotb.fork(bfm.driver_bfm())
-    cocotb.fork(bfm.cmd_mon_bfm())
-    cocotb.fork(bfm.result_mon_bfm())
+    cocotb.fork(bfm.start_bfms())
     cvg = set()
     ops = list(Ops)
     while True:

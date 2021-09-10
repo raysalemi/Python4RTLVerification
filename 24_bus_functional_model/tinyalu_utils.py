@@ -1,3 +1,4 @@
+import cocotb
 from cocotb.triggers import FallingEdge
 from cocotb.queue import QueueEmpty, Queue
 import enum
@@ -104,3 +105,8 @@ class TinyAluBfm:
                 result = int(self.dut.result)
                 self.result_mon_queue.put_nowait(result)
             prev_done = done
+
+    async def start_bfms(self):
+        cocotb.fork(self.driver_bfm())
+        cocotb.fork(self.cmd_mon_bfm())
+        cocotb.fork(self.result_mon_bfm())
