@@ -1,15 +1,16 @@
 import cocotb
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction
 import random
-import logging
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
 @cocotb.test()
 async def test_alu(dut):
     passed = True
-    logging.basicConfig(level=logging.NOTSET)
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
     bfm = TinyAluBfm(dut)
     await bfm.reset()
     cocotb.fork(bfm.start_bfms())

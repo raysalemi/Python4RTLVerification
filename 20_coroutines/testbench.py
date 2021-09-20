@@ -10,14 +10,14 @@ logger.setLevel(logging.INFO)
 
 
 @cocotb.test()
-async def wait_2ns(dut):
+async def wait_2ns(_):
     """Waits for two ns then prints"""
     await Timer(2, units="ns")
     logger.info("I am DONE waiting!")
 
 
 @cocotb.test()
-async def hello_world(dut):
+async def hello_world(_):
     """Say hello!"""
     logger.info("Hello, world.")
 
@@ -36,7 +36,7 @@ async def wait_for_numb(numb, delay):
 
 
 @cocotb.test()
-async def counters(dut):
+async def counters(_):
     """Test that forks two counters and waits for them"""
     logger.info("The Count will count to five.")
     logger.info("Mom will count to three.")
@@ -47,7 +47,7 @@ async def counters(dut):
 
 
 @cocotb.test()
-async def inc_test(dut):
+async def inc_test(_):
     """Demonstrates fork return values"""
     logging.info("sent 1")
     inc1 = cocotb.fork(wait_for_numb(1, 1))
@@ -59,7 +59,7 @@ async def inc_test(dut):
 
 
 @cocotb.test()
-async def awaiting_a_fork(dut):
+async def awaiting_a_fork(_):
     """Learning test to see how awaiting a fork works"""
     c1 = cocotb.fork(counter("Counter 1", 1, 3))
     cr = await c1
@@ -90,7 +90,7 @@ async def consumer(queue):
 
 
 @cocotb.test()
-async def producer_consumer_no_delay(dut):
+async def producer_consumer_no_delay(_):
     """Show producer and consumer with no delay"""
     queue = Queue()
     cocotb.fork(consumer(queue))
@@ -99,7 +99,7 @@ async def producer_consumer_no_delay(dut):
 
 
 @cocotb.test()
-async def producer_consumer_max_size_1(dut):
+async def producer_consumer_max_size_1(_):
     """Show producer and consumer with maxsize 1"""
     queue = Queue(maxsize=1)
     cocotb.fork(consumer(queue))
@@ -108,7 +108,7 @@ async def producer_consumer_max_size_1(dut):
 
 
 @cocotb.test()
-async def producer_consumer_sim_delay(dut):
+async def producer_consumer_sim_delay(_):
     """Show producer and consumer with simulation delay"""
     queue = Queue(maxsize=1)
     cocotb.fork(consumer(queue))

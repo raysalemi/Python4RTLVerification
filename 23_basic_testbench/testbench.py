@@ -2,7 +2,12 @@ import cocotb
 from cocotb.triggers import FallingEdge
 import enum
 import random
-import logging
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import Ops, alu_prediction, logger  # noqa: E402
 
 
 # Not used in the code, only the book
@@ -25,36 +30,9 @@ print(f"Damage {damage} from", weapon.value)
 # end book example
 
 
-class Ops(enum.IntEnum):
-    """Legal ops for the TinyALU"""
-    ADD = 1
-    AND = 2
-    XOR = 3
-    MUL = 4
-
-
-def alu_prediction(A, B, op, error=False):
-    """Python model of the TinyALU"""
-    assert isinstance(op, Ops), "The tinyalu op must be of type ops"
-    if op == Ops.ADD:
-        result = A + B
-    elif op == Ops.AND:
-        result = A & B
-    elif op == Ops.XOR:
-        result = A ^ B
-    elif op == Ops.MUL:
-        result = A * B
-    if error and (random.randint(0, 3) == 0):
-        result = result + 1
-    return result
-
-
 @cocotb.test()
 async def alu_test(dut):
     passed = True
-    logging.basicConfig(level=logging.NOTSET)
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
     cvg = set()  # functional coverage
     await FallingEdge(dut.clk)
     dut.reset_n = 0

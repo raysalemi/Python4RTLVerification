@@ -62,7 +62,7 @@ async def consumer_nw(queue):
 
 
 @cocotb.test()
-async def producer_consumer_no_delay(dut):
+async def producer_consumer_no_delay(_):
     """Show producer and consumer with no delay"""
     queue = Queue()
     cocotb.fork(consumer(queue))
@@ -71,7 +71,7 @@ async def producer_consumer_no_delay(dut):
 
 
 @cocotb.test()
-async def producer_consumer_max_size_1(dut):
+async def producer_consumer_max_size_1(_):
     """Show producer and consumer with maxsize 1"""
     queue = Queue(maxsize=1)
     cocotb.fork(consumer(queue))
@@ -80,7 +80,7 @@ async def producer_consumer_max_size_1(dut):
 
 
 @cocotb.test()
-async def producer_consumer_sim_delay(dut):
+async def producer_consumer_sim_delay(_):
     """Show producer and consumer with simulation delay"""
     queue = Queue(maxsize=1)
     cocotb.fork(consumer(queue))
@@ -89,7 +89,7 @@ async def producer_consumer_sim_delay(dut):
 
 
 @cocotb.test()
-async def producer_consumer_nowait(dut):
+async def producer_consumer_nowait(_):
     """Show producer and consumer not waiting"""
     queue = Queue(maxsize=1)
     cocotb.fork(consumer_nw(queue))

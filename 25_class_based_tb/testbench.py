@@ -1,7 +1,12 @@
 import cocotb
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction
 import random
 import logging
+from pathlib import Path
+import sys
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
 class Tester():
