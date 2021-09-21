@@ -1,7 +1,12 @@
 from pyuvm import *
 from cocotb.triggers import ClockCycles
-from tinyalu_utils import Ops, alu_prediction, TinyAluBfm
 import random
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
 class AluSeqItem(uvm_sequence_item):
@@ -153,5 +158,5 @@ class AluTest(uvm_test):
 async def test_alu(dut):
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
-    await bfm.startup_bfms()
+    await bfm.start_bfms()
     await uvm_root().run_test("AluTest")

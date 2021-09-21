@@ -1,20 +1,12 @@
 import cocotb
 from pyuvm import *
-from tinyalu_utils import alu_prediction, Ops, TinyAluBfm
 import random
-
-"""
-import debugpy
-listen_host, listen_port = debugpy.listen(("localhost",5678))
-print("LISTEN_HOST:", listen_host)
-print("LISTEN_PORT", listen_port)
-cocotb.log.info("Waiting for Python debugger attach"
-" on {}:{}".format(listen_host, listen_port))
-# Suspend execution until debugger attaches
-debugpy.wait_for_client()
-# Break into debugger for user control
-breakpoint()  # or debugpy.breakpoint() on 3.6 and below
-"""
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
 class HelloWorldTest(uvm_test):

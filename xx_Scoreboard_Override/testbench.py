@@ -1,8 +1,13 @@
 import cocotb
 from cocotb.triggers import Timer
 from pyuvm import *
-from tinyalu_utils import TinyAluBfm, alu_prediction, Ops
 import random
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
 class Driver(uvm_component):
@@ -124,7 +129,7 @@ async def good_scoreboard(dut):
     Demonstrates the correct scoreboard
     """
     bfm = TinyAluBfm(dut)
-    await bfm.startup_bfms()
+    await bfm.start_bfms()
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("AluTest")
     assert True
@@ -136,7 +141,7 @@ async def faulty_scoreboard(dut):
     Demonstrates overriding the scoreboard with a bad one
     """
     bfm = TinyAluBfm(dut)
-    await bfm.startup_bfms()
+    await bfm.start_bfms()
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("FaultyTest")
     assert True

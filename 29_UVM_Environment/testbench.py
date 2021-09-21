@@ -1,7 +1,12 @@
 import cocotb
 from pyuvm import *
-from tinyalu_utils import Ops, alu_prediction, TinyAluBfm
 import random
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
 class BaseEnv(uvm_env):

@@ -1,7 +1,12 @@
 import cocotb
 from pyuvm import *
 import random
-from tinyalu_utils import Ops
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import Ops  # noqa:E402
 # Mailbox example
 
 
