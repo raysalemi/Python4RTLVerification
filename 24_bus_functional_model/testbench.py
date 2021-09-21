@@ -10,10 +10,11 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 @cocotb.test()
 async def test_alu(dut):
+    """Test all TinyALU Operations"""
     passed = True
     bfm = TinyAluBfm(dut)
     await bfm.reset()
-    cocotb.fork(bfm.start_bfms())
+    await bfm.start_bfms()
     cvg = set()
     ops = list(Ops)
     while True:
