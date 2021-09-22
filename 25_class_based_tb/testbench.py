@@ -27,15 +27,14 @@ class Tester():
 class Scoreboard():
     def __init__(self, bfm):
         self.bfm = bfm
-        self.ops = []
+        self.cmds = []
         self.results = []
         self.cvg = set()
 
     async def get_cmds(self):
         while True:
-            op = await self.bfm.get_cmd()
-            self.ops.append(op)
-            self.cvg.add(Ops(op[2]))
+            cmd = await self.bfm.get_cmd()
+            self.cmds.append(cmd)
 
     async def get_results(self):
         while True:
@@ -48,16 +47,17 @@ class Scoreboard():
 
     def check_results(self):
         passed = True
-        for cmd in self.ops:
+        for cmd in self.cmds:
             (aa, bb, op) = cmd
-            result = self.results.pop(0)
-            pr = alu_prediction(aa, bb, Ops(op), error=False)
-            if result == pr:
-                logger.info(f"PASSED: {aa} {op} {bb} = {result}")
+            self.cvg.add(Ops(op))
+            actual = self.results.pop(0)
+            prediction = alu_prediction(aa, bb, Ops(op), error=False)
+            if actual == prediction:
+                logger.info(f"PASSED: {aa} {op} {bb} = {actual}")
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {op} {bb} = {result} - predicted {pr}")
+                    f"FAILED: {aa} {op} {bb} = {actual} - predicted {prediction}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
