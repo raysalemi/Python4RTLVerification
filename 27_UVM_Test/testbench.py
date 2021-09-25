@@ -1,12 +1,12 @@
 import cocotb
 from pyuvm import *
 import random
+from pathlib import Path
+import sys
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
-import sys
-from pathlib import Path
 sys.path.append(str(Path("..").resolve()))
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
 class HelloWorldTest(uvm_test):
@@ -16,54 +16,125 @@ class HelloWorldTest(uvm_test):
         self.drop_objection()
 
 
-class AluTest(uvm_test):
+class Tester():
+    def __init__(self, bfm):
+        self.bfm = bfm
 
-    def build_phase(self):
-        self.bfm = ConfigDB().get(self, "", "BFM")
+    async def execute(self):
+        ops = list(Ops)
+        for op in ops:
+            aa = random.randint(0, 255)
+            bb = random.randint(0, 255)
+            await self.bfm.send_op(aa, bb, op)
+        # send two dummy operations to allow
+        # last real operation to complete
+        await self.bfm.send_op(0, 0, 1)
+        await self.bfm.send_op(0, 0, 1)
 
-    async def run_phase(self):
-        self.raise_objection()   # You MUST raise an objection
+
+class MaxTester(Tester):
+
+    async def execute(self):
+        ops = list(Ops)
+        for op in ops:
+            aa = 0xFF
+            bb = 0xFF
+            await self.bfm.send_op(aa, bb, op)
+        # send two dummy operations to allow
+        # last real operation to complete
+        await self.bfm.send_op(0, 0, 1)
+        await self.bfm.send_op(0, 0, 1)
+
+
+class Scoreboard():
+    def __init__(self, bfm):
+        self.bfm = bfm
+        self.cmds = []
+        self.results = []
+        self.cvg = set()
+
+    async def get_cmds(self):
+        while True:
+            cmd = await self.bfm.get_cmd()
+            self.cmds.append(cmd)
+
+    async def get_results(self):
+        while True:
+            result = await self.bfm.get_result()
+            self.results.append(result)
+
+    async def execute(self):
+        cocotb.fork(self.get_cmds())
+        cocotb.fork(self.get_results())
+
+    def check_results(self):
         passed = True
-        cvg = set()  # functional coverage
-        for op in list(Ops):
-            A = random.randrange(256)
-            B = random.randrange(256)
-            cvg.add(op)
-            predicted_result = alu_prediction(A, B, op, error=False)
-            await self.bfm.send_op(A, B, int(op))
-            actual_result = await self.bfm.get_result()
-            if predicted_result == actual_result:
-                self.logger.info(
-                    f"PASSED: {A:02x} {op.name} {B:02x} = {actual_result:04x}")
+        for cmd in self.cmds:
+            (aa, bb, op) = cmd
+            self.cvg.add(Ops(op))
+            actual = self.results.pop(0)
+            prediction = alu_prediction(aa, bb, Ops(op))
+            if actual == prediction:
+                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
             else:
-                self.logger.error(
-                    f"FAILED: {A:02x} {op.name} {B:02x} = "
-                    f"{actual_result:04x} expected {predicted_result:04x}")
                 passed = False
-        if len(set(Ops) - cvg) > 0:
-            self.logger.error(
-                f"Functional coverage error. Missed: {set(Ops)-cvg}")
+                logger.error(
+                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
+
+        if len(set(Ops) - self.cvg) > 0:
+            logger.error(
+                f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
             passed = False
         else:
-            self.logger.info("Covered all operations")
-        assert passed
-        self.drop_objection()  # drop the objection to end
+            logger.info("Covered all operations")
+        return passed
+
+
+async def execute_test(dut, TesterClass):
+    bfm = TinyAluBfm(dut)
+    scoreboard = Scoreboard(bfm)
+    await bfm.reset()
+    await bfm.start_bfms()
+    cocotb.fork(scoreboard.execute())
+    tester = TesterClass(bfm)
+    await tester.execute()
+    passed = scoreboard.check_results()
+    return passed
+
+
+class RandomTest(uvm_test):
+    """Run with random operations"""
+    async def run_phase(self):
+        self.raise_objection()
+        dut = ConfigDB().get(self, "", "DUT")
+        assert await execute_test(dut, Tester)
+        self.drop_objection()
+
+
+class MaxTest(uvm_test):
+    """Run with random operations"""
+    async def run_phase(self):
+        self.raise_objection()
+        dut = ConfigDB().get(self, "", "DUT")
+        assert await execute_test(dut, MaxTester)
+        self.drop_objection()
 
 
 @cocotb.test()
-async def hello_test(dut):
-    """
-    Show a simple Hello World Test
-    """
+async def hello_world(_):
+    """Say hello"""
     await uvm_root().run_test("HelloWorldTest")
 
 
 @cocotb.test()
-async def alu_test(dut):
-    """
-    Run ALU test
-    """
-    bfm = TinyAluBfm(dut)
-    await bfm.startup_bfms()
-    ConfigDB().set(None, "*", "BFM", bfm)
-    await uvm_root().run_test("AluTest")
+async def random_test(dut):
+    """Random operands"""
+    ConfigDB().set(None, "*", "DUT", dut)
+    await uvm_root().run_test("RandomTest")
+
+
+@cocotb.test()
+async def max_test(dut):
+    """Maximum operands"""
+    ConfigDB().set(None, "*", "DUT", dut)
+    await uvm_root().run_test("MaxTest")

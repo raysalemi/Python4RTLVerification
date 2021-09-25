@@ -148,6 +148,6 @@ async def max_env(dut):
     """
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
-    await bfm.startup_bfms()
+    await bfm.start_bfms()
     await uvm_root().run_test("AluTest")
     assert True

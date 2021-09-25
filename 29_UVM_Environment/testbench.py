@@ -93,7 +93,7 @@ async def max_env(dut):
     Demonstrates using an environment to run a different test
     """
     bfm = TinyAluBfm(dut)
-    await bfm.startup_bfms()
+    await bfm.start_bfms()
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("MaxTest")
     assert True

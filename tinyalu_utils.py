@@ -64,6 +64,13 @@ class TinyAluBfm:
         self.dut.reset_n <= 1
         await FallingEdge(self.dut.clk)
 
+    def get_int(self, signal):
+        try:
+            sig = int(signal)
+        except ValueError:
+            sig = 0
+        return sig
+
     async def driver_bfm(self):
         self.dut.start <= 0
         self.dut.A <= 0
@@ -71,7 +78,9 @@ class TinyAluBfm:
         self.dut.op <= 0
         while True:
             await FallingEdge(self.dut.clk)
-            if self.dut.start.value == 0 and self.dut.done.value == 0:
+            start = self.get_int(self.dut.start.value)
+            done = self.get_int(self.dut.done.value)
+            if start == 0 and done == 0:
                 try:
                     (aa, bb, op) = self.driver_queue.get_nowait()
                     self.dut.A <= aa
@@ -80,18 +89,15 @@ class TinyAluBfm:
                     self.dut.start <= 1
                 except QueueEmpty:
                     pass
-            elif self.dut.start.value == 1:
-                if self.dut.done.value == 1:
+            elif start == 1:
+                if done == 1:
                     self.dut.start = 0
 
     async def cmd_mon_bfm(self):
         prev_start = 0
         while True:
             await FallingEdge(self.dut.clk)
-            try:
-                start = int(self.dut.start.value)
-            except ValueError:
-                start = 0
+            start = self.get_int(self.dut.start.value)
             if start == 1 and prev_start == 0:
                 cmd_tuple = (int(self.dut.A),
                              int(self.dut.B),
@@ -103,13 +109,9 @@ class TinyAluBfm:
         prev_done = 0
         while True:
             await FallingEdge(self.dut.clk)
-            try:
-                done = int(self.dut.done.value)
-            except ValueError:
-                done = 0
-
+            done = self.get_int(self.dut.done.value)
             if prev_done == 0 and done == 1:
-                result = int(self.dut.result.value)
+                result = self.get_int(self.dut.result.value)
                 self.result_mon_queue.put_nowait(result)
             prev_done = done
 

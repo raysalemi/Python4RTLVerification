@@ -24,6 +24,20 @@ class Tester():
         await self.bfm.send_op(0, 0, 1)
 
 
+class MaxTester(Tester):
+
+    async def execute(self):
+        ops = list(Ops)
+        for op in ops:
+            aa = 0xFF
+            bb = 0xFF
+            await self.bfm.send_op(aa, bb, op)
+        # send two dummy operations to allow
+        # last real operation to complete
+        await self.bfm.send_op(0, 0, 1)
+        await self.bfm.send_op(0, 0, 1)
+
+
 class Scoreboard():
     def __init__(self, bfm):
         self.bfm = bfm
@@ -51,13 +65,13 @@ class Scoreboard():
             (aa, bb, op) = cmd
             self.cvg.add(Ops(op))
             actual = self.results.pop(0)
-            prediction = alu_prediction(aa, bb, Ops(op), error=False)
+            prediction = alu_prediction(aa, bb, Ops(op))
             if actual == prediction:
-                logger.info(f"PASSED: {aa} {op} {bb} = {actual}")
+                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {op} {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
@@ -79,3 +93,27 @@ async def test_alu(dut):
     await tester.execute()
     passed = scoreboard.check_results()
     assert passed
+
+
+async def execute_test(dut, TesterClass):
+    bfm = TinyAluBfm(dut)
+    scoreboard = Scoreboard(bfm)
+    await bfm.reset()
+    await bfm.start_bfms()
+    cocotb.fork(scoreboard.execute())
+    tester = TesterClass(bfm)
+    await tester.execute()
+    passed = scoreboard.check_results()
+    return passed
+
+
+@cocotb.test()
+async def random_test(dut):
+    """Random operands"""
+    assert await execute_test(dut, Tester)
+
+
+@cocotb.test()
+async def max_test(dut):
+    """Maximum operands"""
+    assert await execute_test(dut, MaxTester)
