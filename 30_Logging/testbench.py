@@ -20,8 +20,16 @@ class LogTest(uvm_test):
     def build_phase(self):
         self.comp = LogComp("comp", self)
 
+
+class DebugTest(LogTest):
     def end_of_elaboration_phase(self):
-        self.set_logging_level_hier(FIFO_DEBUG)
+        self.set_logging_level_hier(DEBUG)
+
+
+class FifoDebugTest(LogTest):
+    def end_of_elaboration_phase(self):
+        self.set_logging_level_hier(DEBUG)
+
 
 
 @cocotb.test()
