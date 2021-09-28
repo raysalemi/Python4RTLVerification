@@ -98,6 +98,42 @@ class NonBlockingFIFOTest(uvm_test):
         self.cons.gp.connect(self.fifo.get_export)
 
 
+class Producer(uvm_component):
+    def build_phase(self):
+        self.pp = uvm_put_port("pp", self)
+
+    async def run_phase(self):
+        self.raise_objection()
+        for nn in range(5):
+            await self.pp.put(nn)
+            print(f"Put {nn}", end=" ")
+        self.drop_objection()
+
+
+class Consumer(uvm_component):
+    def build_phase(self):
+        self.gp = uvm_get_port("gp", self)
+
+    async def run_phase(self):
+        while True:
+            nn = await self.gp.get()
+            print(f"Got {nn}", end=" ")
+
+
+class FIFO_DEBUG_Test(uvm_test):
+    def build_phase(self):
+        self.prod = Producer("prod", self)
+        self.cons = Consumer("cons", self)
+        self.fifo = uvm_tlm_fifo("fifo", self)
+
+    def end_of_elaboration_phase(self):
+        self.set_logging_level_hier(FIFO_DEBUG)
+
+    def connect_phase(self):
+        self.prod.pp.connect(self.fifo.put_export)
+        self.cons.gp.connect(self.fifo.get_export)
+
+
 @cocotb.test()
 async def non_blocking_fifo(dut):
     """Blocking FIFO example"""
