@@ -102,6 +102,7 @@ class BaseAluEnv(uvm_env):
         ConfigDB().set(None, "*", "BFM", bfm)
         self.scoreboard = Scoreboard("scoreboard", self)
 
+
 class RandomAluEnv(BaseAluEnv):
     """Generate random operands"""
 
