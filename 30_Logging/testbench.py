@@ -31,6 +31,11 @@ class FileTest(LogTest):
         self.remove_streaming_handler_hier()
 
 
+class NoLog(LogTest):
+    def end_of_elaboration_phase(self):
+        self.disable_logging_hier()
+
+
 @cocotb.test()
 async def default_logging_levels(_):
     """Demonstrate default logging levels"""
@@ -45,5 +50,11 @@ async def debug_logging_level(_):
 
 @cocotb.test()
 async def log_to_file(_):
-    """Write log messages to file"""
+    """Write log messages to file with no streaming"""
     await uvm_root().run_test("FileTest")
+
+
+@cocotb.test()
+async def disable_logging(_):
+    """Demonstrated the blessed silence of disabled logging"""
+    await uvm_root().run_test("NoLog")
