@@ -9,7 +9,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-async def producer(queue, nn, delay=None):
+async def Producer(queue, nn, delay=None):
     """Produce numbers from 1 to nn and send them"""
     for datum in range(1, nn + 1):
         if delay is not None:
@@ -19,7 +19,7 @@ async def producer(queue, nn, delay=None):
         logger.info(f"Producer sent {datum}")
 
 
-async def consumer(queue):
+async def Consumer(queue):
     """Get numbers and print them to the log"""
     while True:
         logger.info("Consumer getting datum")
@@ -27,7 +27,7 @@ async def consumer(queue):
         logger.info(f"Consumer got {datum}")
 
 
-async def producer_nw(queue, nn, delay=None):
+async def ProducerNoWait(queue, nn, delay=None):
     """Produce numbers from 1 to nn and send them"""
     for datum in range(1, nn + 1):
         if delay is not None:
@@ -45,7 +45,7 @@ async def producer_nw(queue, nn, delay=None):
         logger.info(f"Producer sent {datum}")
 
 
-async def consumer_nw(queue):
+async def ConsumerNoWait(queue):
     """Get numbers and print them to the log"""
     while True:
         logger.info("Consumer getting datum")
@@ -65,8 +65,8 @@ async def consumer_nw(queue):
 async def producer_consumer_no_delay(_):
     """Show producer and consumer with no delay"""
     queue = Queue()
-    cocotb.fork(consumer(queue))
-    await producer(queue, 2)
+    cocotb.fork(Consumer(queue))
+    await Producer(queue, 2)
     await Timer(1, units="ns")
 
 
@@ -74,8 +74,8 @@ async def producer_consumer_no_delay(_):
 async def producer_consumer_max_size_1(_):
     """Show producer and consumer with maxsize 1"""
     queue = Queue(maxsize=1)
-    cocotb.fork(consumer(queue))
-    await producer(queue, 2)
+    cocotb.fork(Consumer(queue))
+    await Producer(queue, 2)
     await Timer(1, units="ns")
 
 
@@ -83,8 +83,8 @@ async def producer_consumer_max_size_1(_):
 async def producer_consumer_sim_delay(_):
     """Show producer and consumer with simulation delay"""
     queue = Queue(maxsize=1)
-    cocotb.fork(consumer(queue))
-    await producer(queue, 2, 5)
+    cocotb.fork(Consumer(queue))
+    await Producer(queue, 2, 5)
     await Timer(1, units="ns")
 
 
@@ -92,6 +92,6 @@ async def producer_consumer_sim_delay(_):
 async def producer_consumer_nowait(_):
     """Show producer and consumer not waiting"""
     queue = Queue(maxsize=1)
-    cocotb.fork(consumer_nw(queue))
-    await producer_nw(queue, 2)
+    cocotb.fork(ConsumerNoWait(queue))
+    await ProducerNoWait(queue, 2)
     await Timer(5, units="ns")
