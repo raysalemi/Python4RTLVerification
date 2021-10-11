@@ -21,7 +21,7 @@ class Ops(enum.IntEnum):
 
 def alu_prediction(A, B, op, error=False):
     """Python model of the TinyALU"""
-    assert isinstance(op, Ops), "The tinyalu op must be of type ops"
+    assert isinstance(op, Ops), "The tinyalu op must be of type Ops"
     if op == Ops.ADD:
         result = A + B
     elif op == Ops.AND:
