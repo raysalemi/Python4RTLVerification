@@ -17,10 +17,9 @@ async def test_alu(dut):
     await bfm.start_bfms()
     cvg = set()
     ops = list(Ops)
-    while True:
+    for op in ops:
         aa = random.randint(0, 255)
         bb = random.randint(0, 255)
-        op = ops.pop()
         await bfm.send_op(aa, bb, op)
         seen_cmd = await bfm.get_cmd()
         seen_op = Ops(seen_cmd[2])
@@ -29,14 +28,13 @@ async def test_alu(dut):
         result = int(dut.result.value)
         pr = alu_prediction(aa, bb, op, error=False)
         if result == pr:
-            logger.info(f"PASSED: {aa} {op} {bb} = {result}")
+            logger.info(f"PASSED: {aa} {op.name} {bb} = {result}")
         else:
-            logger.error(f"FAILED: {aa} {op} {bb} = {result} - predicted {pr}")
+            logger.error(f"FAILED: {aa} {op.name} {bb} = {result} - predicted {pr}")
             passed = False
-        if len(ops) == 0:
-            if len(set(Ops) - cvg) > 0:
-                logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
-            else:
-                logger.info("Covered all operations")
-            break
+    if len(set(Ops) - cvg) > 0:
+        logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
+        passed = False
+    else:
+        logger.info("Covered all operations")
     assert passed

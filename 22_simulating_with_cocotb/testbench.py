@@ -18,7 +18,7 @@ async def no_count(dut):
     """Test no count if reset is 0"""
     dut.reset_n = 0
     await ClockCycles(dut.clk, 5)
-    count = get_int(dut.count.value)
+    count = get_int(dut.count)
     logger.info(f"After 5 clocks count is {count}")
     assert count == 0
 
@@ -30,7 +30,7 @@ async def three_count(dut):
     await FallingEdge(dut.clk)
     dut.reset_n = 1
     await ClockCycles(dut.clk, 3, rising=False)
-    count = get_int(dut.count.value)
+    count = get_int(dut.count)
     logger.info(f"After 3 clocks, count is {count}")
     assert count == 3
 

@@ -37,7 +37,7 @@ def alu_prediction(A, B, op, error=False):
 
 def get_int(signal):
     try:
-        sig = int(signal)
+        sig = int(signal.value)
     except ValueError:
         sig = 0
     return sig
@@ -79,8 +79,8 @@ class TinyAluBfm:
         self.dut.op <= 0
         while True:
             await FallingEdge(self.dut.clk)
-            start = get_int(self.dut.start.value)
-            done = get_int(self.dut.done.value)
+            start = get_int(self.dut.start)
+            done = get_int(self.dut.done)
             if start == 0 and done == 0:
                 try:
                     (aa, bb, op) = self.driver_queue.get_nowait()
@@ -92,17 +92,17 @@ class TinyAluBfm:
                     pass
             elif start == 1:
                 if done == 1:
-                    self.dut.start = 0
+                    self.dut.start <= 0
 
     async def cmd_mon_bfm(self):
         prev_start = 0
         while True:
             await FallingEdge(self.dut.clk)
-            start = get_int(self.dut.start.value)
+            start = get_int(self.dut.start)
             if start == 1 and prev_start == 0:
-                cmd_tuple = (int(self.dut.A),
-                             int(self.dut.B),
-                             int(self.dut.op))
+                cmd_tuple = (get_int(self.dut.A),
+                             get_int(self.dut.B),
+                             get_int(self.dut.op))
                 self.cmd_mon_queue.put_nowait(cmd_tuple)
             prev_start = start
 
@@ -110,9 +110,9 @@ class TinyAluBfm:
         prev_done = 0
         while True:
             await FallingEdge(self.dut.clk)
-            done = get_int(self.dut.done.value)
+            done = get_int(self.dut.done)
             if prev_done == 0 and done == 1:
-                result = get_int(self.dut.result.value)
+                result = get_int(self.dut.result)
                 self.result_mon_queue.put_nowait(result)
             prev_done = done
 
