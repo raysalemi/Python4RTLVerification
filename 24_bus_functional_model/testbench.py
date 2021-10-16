@@ -26,7 +26,7 @@ async def test_alu(dut):
         cvg.add(seen_op)
         result = await bfm.get_result()
         result = int(dut.result.value)
-        pr = alu_prediction(aa, bb, op, error=False)
+        pr = alu_prediction(aa, bb, op)
         if result == pr:
             logger.info(f"PASSED: {aa} {op.name} {bb} = {result}")
         else:

@@ -14,30 +14,30 @@ async def alu_test(dut):
     passed = True
     cvg = set()  # functional coverage
     await FallingEdge(dut.clk)
-    dut.reset_n = 0
-    dut.start = 0
+    dut.reset_n <= 0
+    dut.start <= 0
     await FallingEdge(dut.clk)
-    dut.reset_n = 1
+    dut.reset_n <= 1
     cmd_count = 1
-    while cmd_count <= 6:
+    while cmd_count <= 4:
         await FallingEdge(dut.clk)
-        st = get_int(dut.start.value)
-        dn = get_int(dut.done.value)
+        st = get_int(dut.start)
+        dn = get_int(dut.done)
         if st == 0 and dn == 0:
             aa = random.randint(0, 255)
             bb = random.randint(0, 255)
             op = random.choice(list(Ops))
             cvg.add(op)
-            dut.A = aa
-            dut.B = bb
-            dut.op = op
-            dut.start = 1
+            dut.A <= aa
+            dut.B <= bb
+            dut.op <= op
+            dut.start <= 1
         if st == 1 and dn == 0 or st == 0 and dn == 1:
             continue
         if st == 1 and dn == 1:
-            dut.start = 0
+            dut.start <= 0
             cmd_count += 1
-            result = get_int(dut.result.value)
+            result = get_int(dut.result)
             pr = alu_prediction(aa, bb, op)
             if result == pr:
                 logger.info(f"PASSED: {aa} {op.name} {bb} = {result}")
