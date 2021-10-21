@@ -41,6 +41,17 @@ class AluSeq(uvm_sequence):
             await self.finish_item(cmd_tr)
 
 
+class MaxSeq(uvm_sequence):
+    async def body(self):
+        for op in list(Ops):
+            cmd_tr = AluSeqItem("cmd_tr")
+            await self.start_item(cmd_tr)
+            cmd_tr.A = 0xff
+            cmd_tr.B = 0xff
+            cmd_tr.op = op
+            await self.finish_item(cmd_tr)
+
+
 class Driver(uvm_driver):
     def connect_phase(self):
         self.bfm = self.cdb_get("BFM")
@@ -141,18 +152,21 @@ class AluTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv.create("env", self)
 
+    def end_of_elaboration_phase(self):
+        self.seqr = ConfigDB().get(self, "", "SEQR")
+        self.bfm = ConfigDB().get(self, "", "BFM")
+
     async def run_phase(self):
         self.raise_objection()
-        seqr = ConfigDB().get(self, "", "SEQR")
-        bfm = ConfigDB().get(self, "", "BFM")
-        seq = AluSeq("seq")
-        await seq.start(seqr)
-        await ClockCycles(bfm.dut.clk, 50)  # to do last transaction
+        seq = AluSeq.create("seq")
+        await seq.start(self.seqr)
+        await ClockCycles(self.bfm.dut.clk, 50)  # to do last transaction
         self.drop_objection()
 
-    def end_of_elaboration_phase(self):
-        self.set_logging_level_hier(logging.DEBUG)
 
+class MaxAluTest(AluTest):
+    def start_of_simulation_phase(self):
+        uvm_factory().set_type_override_by_type(AluSeq, MaxSeq)
 
 @cocotb.test()
 async def test_alu(dut):
@@ -160,3 +174,11 @@ async def test_alu(dut):
     ConfigDB().set(None, "*", "BFM", bfm)
     await bfm.start_bfms()
     await uvm_root().run_test("AluTest")
+
+@cocotb.test()
+async def max_test_alu(dut):
+    """Test alu with maximum values"""
+    bfm = TinyAluBfm(dut)
+    ConfigDB().set(None, "*", "BFM", bfm)
+    await bfm.start_bfms()
+    await uvm_root().run_test("MaxAluTest")

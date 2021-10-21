@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../tmp"
+		},
+		{
+			"path": "../cocotb"
 		}
 	],
 	"settings": {
