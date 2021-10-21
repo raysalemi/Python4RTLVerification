@@ -62,16 +62,17 @@ class Scoreboard():
     def check_results(self):
         passed = True
         for cmd in self.cmds:
-            (aa, bb, op) = cmd
-            self.cvg.add(Ops(op))
+            aa, bb, op_int = cmd
+            op = Ops(op_int)
+            self.cvg.add(op)
             actual = self.results.pop(0)
-            prediction = alu_prediction(aa, bb, Ops(op))
+            prediction = alu_prediction(aa, bb, op)
             if actual == prediction:
-                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
+                logger.info(f"PASSED: {aa} {op.name} {bb} = {actual}")
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa} {op.name} {bb} = {actual} - predicted {prediction}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(

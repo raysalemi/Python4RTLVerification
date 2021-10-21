@@ -107,7 +107,8 @@ class RandomTest(uvm_test):
     async def run_phase(self):
         self.raise_objection()
         dut = ConfigDB().get(self, "", "DUT")
-        assert await execute_test(dut, Tester)
+        passed = await execute_test(dut, Tester)
+        assert passed
         self.drop_objection()
 
 
@@ -116,7 +117,8 @@ class MaxTest(uvm_test):
     async def run_phase(self):
         self.raise_objection()
         dut = ConfigDB().get(self, "", "DUT")
-        assert await execute_test(dut, MaxTester)
+        passed = await execute_test(dut, MaxTester)
+        assert passed
         self.drop_objection()
 
 

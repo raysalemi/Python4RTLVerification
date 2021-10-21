@@ -27,11 +27,8 @@ class LogTest(uvm_test):
         ConfigDB().set(self, "env.logb", "MSG", "logb msg")
 
 
-
-
 @cocotb.test()
 async def name_myself(dut):
     """Exercise hierarchy naming"""
     await uvm_root().run_test("LogTest")
     assert True
-

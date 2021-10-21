@@ -5,7 +5,7 @@ import random
 import sys
 from pathlib import Path
 sys.path.append(str(Path("..").resolve()))
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger, get_int  # noqa: E402
 
 
 @cocotb.test()
@@ -25,16 +25,10 @@ async def test_alu(dut):
         seen_op = Ops(seen_cmd[2])
         cvg.add(seen_op)
         result = await bfm.get_result()
-        result = int(dut.result.value)
         pr = alu_prediction(aa, bb, op)
         if result == pr:
             logger.info(f"PASSED: {aa} {op.name} {bb} = {result}")
         else:
             logger.error(f"FAILED: {aa} {op.name} {bb} = {result} - predicted {pr}")
             passed = False
-    if len(set(Ops) - cvg) > 0:
-        logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
-        passed = False
-    else:
-        logger.info("Covered all operations")
     assert passed
