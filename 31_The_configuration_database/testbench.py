@@ -28,7 +28,7 @@ class LogTest(uvm_test):
 
 
 @cocotb.test()
-async def name_myself(dut):
-    """Exercise hierarchy naming"""
+async def log_msgs(dut):
+    """Exercise hierarchy storage"""
     await uvm_root().run_test("LogTest")
     assert True
