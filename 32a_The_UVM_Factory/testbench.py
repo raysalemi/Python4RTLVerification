@@ -117,7 +117,6 @@ class MaxTest(uvm_test):
         self.env = AluEnv("env", self)
 
 
-
 @cocotb.test()
 async def random_test(dut):
     """Random operands"""

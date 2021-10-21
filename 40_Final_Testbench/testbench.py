@@ -168,12 +168,14 @@ class MaxAluTest(AluTest):
     def start_of_simulation_phase(self):
         uvm_factory().set_type_override_by_type(AluSeq, MaxSeq)
 
+
 @cocotb.test()
 async def test_alu(dut):
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
     await bfm.start_bfms()
     await uvm_root().run_test("AluTest")
+
 
 @cocotb.test()
 async def max_test_alu(dut):
