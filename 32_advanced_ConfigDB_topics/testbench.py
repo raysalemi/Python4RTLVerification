@@ -83,6 +83,7 @@ async def test_env(_):
     ConfigDB().clear()
     await uvm_root().run_test("NumberEnv")
 
+
 @cocotb.test()
 async def test_env_wc(_):
     """Demonstrate global wildcard"""
@@ -90,6 +91,7 @@ async def test_env_wc(_):
     ConfigDB().clear()
     ConfigDB().set(None, "*", "NUMB", -99)
     await uvm_root().run_test("NumberEnv")
+
 
 @cocotb.test()
 async def wc_env_test(_):
