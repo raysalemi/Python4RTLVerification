@@ -16,12 +16,12 @@ class Driver(uvm_component):
 
     async def run_phase(self):
         self.raise_objection()
-        for _ in range(5):
+        for op in list(Ops):
             aa = random.randrange(256)
             bb = random.randrange(256)
-            op = random.choice(list(Ops))
             await self.bfm.send_op(aa, bb, op)
-        Timer(200)
+        await self.bfm.send_op(0, 0, Ops.ADD)
+        await self.bfm.send_op(0, 0, Ops.ADD)
         self.drop_objection()
 
 

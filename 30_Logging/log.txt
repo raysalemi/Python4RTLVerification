@@ -1,0 +1,4 @@
+  2000.00ns INFO     testbench.py(10)[uvm_test_top]: This is info
+  2000.00ns [33mWARNING [49m[39m [33mtestbench.py(11)[uvm_test_top]: This is warning[49m[39m
+  2000.00ns [31mERROR   [49m[39m [31mtestbench.py(12)[uvm_test_top]: This is error[49m[39m
+  2000.00ns [41m[30mCRITICAL[49m[39m [41m[30mtestbench.py(13)[uvm_test_top]: This is critical[49m[39m

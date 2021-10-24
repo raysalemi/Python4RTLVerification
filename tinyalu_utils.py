@@ -73,10 +73,10 @@ class TinyAluBfm:
         await FallingEdge(self.dut.clk)
 
     async def driver_bfm(self):
-        self.dut.start <= 0
-        self.dut.A <= 0
-        self.dut.B <= 0
-        self.dut.op <= 0
+        self.dut.start.value = 0
+        self.dut.A.value = 0
+        self.dut.B.value = 0
+        self.dut.op.value = 0
         while True:
             await FallingEdge(self.dut.clk)
             start = get_int(self.dut.start)
@@ -84,15 +84,15 @@ class TinyAluBfm:
             if start == 0 and done == 0:
                 try:
                     (aa, bb, op) = self.driver_queue.get_nowait()
-                    self.dut.A <= aa
-                    self.dut.B <= bb
-                    self.dut.op <= op
-                    self.dut.start <= 1
+                    self.dut.A.value = aa
+                    self.dut.B.value = bb
+                    self.dut.op.value = op
+                    self.dut.start.value = 1
                 except QueueEmpty:
                     pass
             elif start == 1:
                 if done == 1:
-                    self.dut.start <= 0
+                    self.dut.start.value = 0
 
     async def cmd_mon_bfm(self):
         prev_start = 0
