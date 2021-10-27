@@ -61,6 +61,11 @@ class MediumNameTest(TinyFactoryTest):
             "TinyComponent", "MediumComponent")
         super().build_phase()
 
+    def report_phase(self):
+        uvm_factory().debug_level = 0
+        uvm_factory_str = str(uvm_factory())
+        self.logger.info(uvm_factory_str)
+
 
 @cocotb.test()
 async def medium_name_test(_):
@@ -84,6 +89,21 @@ class TwoCompTest(uvm_test):
 async def two_comp_test(_):
     uvm_factory().clear_overrides()
     await uvm_root().run_test("TwoCompTest")
+    uvm_factory().print(0)
+
+
+class CreateTest(uvm_test):
+    def build_phase(self):
+        self.tc = uvm_factory().create_component_by_name(
+            "TinyComponent",
+            name="tc", parent=self)
+
+
+@cocotb.test()
+async def create_test(_):
+    """Create a component using factory"""
+    uvm_factory().clear_overrides()
+    await uvm_root().run_test("CreateTest")
 
 
 class Tester(uvm_component):
@@ -204,5 +224,6 @@ async def random_test(dut):
 @cocotb.test()
 async def max_test(dut):
     """Maximum operands"""
+    ConfigDB().clear()
     ConfigDB().set(None, "*", "DUT", dut)
     await uvm_root().run_test("MaxTest")
