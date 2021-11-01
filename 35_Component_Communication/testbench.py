@@ -1,5 +1,5 @@
 import cocotb
-from cocotb.triggers import Timer 
+from cocotb.triggers import Timer
 from pyuvm import *
 
 
@@ -39,3 +39,55 @@ class BlockingTest(uvm_test):
 @cocotb.test()
 async def blocking_test(_):
     await uvm_root().run_test("BlockingTest")
+
+
+class NonBlockingProducer(uvm_component):
+    def build_phase(self):
+        self.nbpp = uvm_nonblocking_put_port("nbpp", self)
+
+    async def run_phase(self):
+        self.raise_objection()
+        for nn in range(3):
+            self.logger.info(f"Putting: {nn}")
+            success = False
+            while not success:
+                success = self.nbpp.try_put(nn)
+                if success:
+                    self.logger.info(f"Put {nn}")
+                else:
+                    self.logger.info("FIFO full")
+                    await Timer(1, units="us")
+        await Timer(3, units="us")
+        self.drop_objection()
+
+
+class NonBlockingConsumer(uvm_component):
+    def build_phase(self):
+        self.nbgp = uvm_nonblocking_get_port("nbgp", self)
+
+    async def run_phase(self):
+        while True:
+            success = False
+            while not success:
+                success, nn = self.nbgp.try_get()
+                if success:
+                    self.logger.info(f"Got {nn}")
+                else:
+                    self.logger.info("FIFO empty")
+                    await Timer(3, units="us")
+
+
+class NonBlockingTest(BlockingTest):
+    def build_phase(self):
+        self.producer = NonBlockingProducer("producer", self)
+        self.consumer = NonBlockingConsumer("consumer", self)
+        self.fifo = uvm_tlm_fifo("fifo", self)
+
+    def connect_phase(self):
+        self.producer.nbpp.connect(self.fifo.put_export)
+        self.consumer.nbgp.connect(self.fifo.get_export)
+
+
+@cocotb.test()
+async def nonblocking_test(_):
+    await uvm_root().run_test("NonBlockingTest")

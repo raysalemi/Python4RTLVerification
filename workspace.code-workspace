@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../cocotb"
+		},
+		{
+			"path": "../vh_blog_examples"
 		}
 	],
 	"settings": {
