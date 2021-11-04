@@ -7,3 +7,5 @@ results.xml
 sim_build
 put.txt
 .tox
+modelsim.ini
+transcript
