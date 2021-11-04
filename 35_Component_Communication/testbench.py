@@ -38,6 +38,7 @@ class BlockingTest(uvm_test):
 
 @cocotb.test()
 async def blocking_test(_):
+    """Demonstrate blocking"""
     await uvm_root().run_test("BlockingTest")
 
 
@@ -77,7 +78,7 @@ class NonBlockingConsumer(uvm_component):
                     await Timer(3, units="us")
 
 
-class NonBlockingTest(BlockingTest):
+class NonBlockingTest(uvm_test):
     def build_phase(self):
         self.producer = NonBlockingProducer("producer", self)
         self.consumer = NonBlockingConsumer("consumer", self)
@@ -88,6 +89,18 @@ class NonBlockingTest(BlockingTest):
         self.consumer.nbgp.connect(self.fifo.get_export)
 
 
+class LoggedBlockingtest(BlockingTest):
+    def end_of_elaboration_phase(self):
+        self.fifo.set_logging_level_hier(FIFO_DEBUG)
+
+
 @cocotb.test()
 async def nonblocking_test(_):
+    """Demonstrate nonblocking"""
     await uvm_root().run_test("NonBlockingTest")
+
+
+@cocotb.test()
+async def logged_blocking_test(_):
+    """Demonstrate logging"""
+    await uvm_root().run_test("LoggedBlockingtest")
