@@ -7,7 +7,5 @@ TOPLEVEL := counter
 COCOTB_HDL_TIMEUNIT=1ns
 COCOTB_HDL_TIMEPRECISION=1ns
 include $(shell cocotb-config --makefiles)/Makefile.sim
+include ../Makefile.cleanall
 
-cleanall: clean
-	@rm -rf __pycache__
-	@rm -f results.xml

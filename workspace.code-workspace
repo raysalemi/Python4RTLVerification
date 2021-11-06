@@ -4,9 +4,6 @@
 			"path": "."
 		},
 		{
-			"path": "../pyuvm"
-		},
-		{
 			"path": "../tmp"
 		},
 		{
@@ -14,6 +11,12 @@
 		},
 		{
 			"path": "../vh_blog_examples"
+		},
+		{
+			"path": "../pyuvm"
+		},
+		{
+			"path": "../junk"
 		}
 	],
 	"settings": {

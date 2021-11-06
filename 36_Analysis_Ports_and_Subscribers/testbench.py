@@ -65,9 +65,26 @@ class Average(uvm_component):
         self.logger.info(f"Average: {sum/count:0.2f}")
 
 
+class AverageTest(uvm_test):
+    def build_phase(self):
+        self.num_gen = NumberGenerator("num_gen", self)
+        self.sum = Adder("sum", self)
+        self.avg = Average("avg", self)
+
+    def connect_phase(self):
+        self.num_gen.ap.connect(self.sum)
+        self.num_gen.ap.connect(self.avg.fifo.analysis_export)
+
+
+@cocotb.test()
+async def avg_test(_):
+    """Test the Average"""
+    await uvm_root().run_test("AverageTest")
+
+
 class Median(uvm_subscriber):
 
-    def build_phase(self):
+    def start_of_simulation_phase(self):
         self.numb_list = []
 
     def write(self, nn):
@@ -77,7 +94,7 @@ class Median(uvm_subscriber):
         self.logger.info(f"Median: {statistics.median(self.numb_list)}")
 
 
-class NumbTest(uvm_test):
+class MedianTest(uvm_test):
     def build_phase(self):
         self.num_gen = NumberGenerator("num_gen", self)
         self.sum = Adder("sum", self)
@@ -91,5 +108,6 @@ class NumbTest(uvm_test):
 
 
 @cocotb.test()
-async def num_test(_):
-    await uvm_root().run_test("NumbTest")
+async def median_test(_):
+    """Test the Median"""
+    await uvm_root().run_test("MedianTest")

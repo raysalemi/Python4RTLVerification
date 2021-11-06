@@ -1,5 +1,4 @@
 import cocotb
-from cocotb.triggers import Timer
 from pyuvm import *
 import random
 # All testbenches use tinyalu_utils, so store it in a central
@@ -133,7 +132,7 @@ class AluEnv(uvm_env):
         self.passive_agent.result_ap.connect(self.scoreboard.result_export)
 
         # For coverage
-        self.passive_agent.cmd_ap.connect(self.coverage)
+        self.passive_agent.cmd_ap.connect(self.coverage.analysis_export)
 
 
 class AluTest(uvm_test):

@@ -9,7 +9,7 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import Ops, alu_prediction, logger, get_int  # noqa: E402
 
 
-@cocotb.test()
+@cocotb.test(expect_error=AssertionError)
 async def alu_test(dut):
     passed = True
     cvg = set()  # functional coverage

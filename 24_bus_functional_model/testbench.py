@@ -5,7 +5,7 @@ import random
 import sys
 from pathlib import Path
 sys.path.append(str(Path("..").resolve()))
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger, get_int  # noqa: E402
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
 @cocotb.test()
