@@ -9,3 +9,4 @@ put.txt
 .tox
 modelsim.ini
 transcript
+*.egg-info

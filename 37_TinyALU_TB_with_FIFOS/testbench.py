@@ -1,142 +1,161 @@
 import cocotb
-from cocotb.triggers import Timer
 from pyuvm import *
 import random
+from pathlib import Path
+import sys
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
-# Blocking Ports
+class RandomTester(uvm_component):
 
-
-class BlockingProducer(uvm_component):
     def build_phase(self):
-        self.pp = uvm_put_port("pp", self)
+        self.bpp = uvm_blocking_put_port("bpp", self)
+
+    async def until_done(self):
+        await self.bpp.put((0, 0, Ops.ADD))
+        await self.bpp.put((0, 0, Ops.ADD))
+        await self.bpp.put((0, 0, Ops.ADD))
+        await self.bpp.put((0, 0, Ops.ADD))
 
     async def run_phase(self):
         self.raise_objection()
-        for nn in range(3):
-            await self.pp.put(nn)
-            print(f"Put {nn}", end=" ")
+        ops = list(Ops)
+        for op in ops:
+            aa = random.randint(0, 255)
+            bb = random.randint(0, 255)
+            await self.bpp.put((aa, bb, op))
+        # send two dummy operations to allow
+        # last real operation to complete
+        await self.until_done()
         self.drop_objection()
 
 
-class BlockingConsumer(uvm_component):
+class Driver(uvm_driver):
+
     def build_phase(self):
-        self.gp = uvm_get_port("gp", self)
+        self.bfm = ConfigDB().get(self, "", "BFM")
+        self.bgp = uvm_blocking_get_port("bgp", self)
 
     async def run_phase(self):
+        await self.bfm.reset()
+        await self.bfm.start_bfms()
         while True:
-            nn = await self.gp.get()
-            print(f"Got {nn}", end=" ")
+            aa, bb, op = await self.bgp.get()
+            self.logger.info(f"******* SENDING op: {(aa, op.name, bb)}")
+            await self.bfm.send_op(aa, bb, op)
+            self.logger.info(f"******* SENT op: {(aa, op.name, bb)}")
 
 
-class BlockingFIFOTest(uvm_test):
+class MaxTester(RandomTester):
+
+    async def run_phase(self):
+        self.raise_objection()
+        ops = list(Ops)
+        for op in ops:
+            aa = 0xFF
+            bb = 0xFF
+            await self.bpp.put((aa, bb, op))
+        # send two dummy operations to allow
+        # last real operation to complete
+        await self.until_done()
+        self.drop_objection()
+
+
+class Scoreboard(uvm_component):
+
     def build_phase(self):
-        self.prod = BlockingProducer("prod", self)
-        self.cons = BlockingConsumer("cons", self)
-        self.fifo = uvm_tlm_fifo("fifo", self)
+        self.bfm = ConfigDB().get(self, "", "BFM")
+        self.cmds = []
+        self.results = []
+        self.cvg = set()
+
+    async def get_cmds(self):
+        while True:
+            cmd = await self.bfm.get_cmd()
+            self.logger.info(f"***** GOT op: {cmd}")
+            self.cmds.append(cmd)
+
+    async def get_results(self):
+        while True:
+            result = await self.bfm.get_result()
+            self.results.append(result)
+
+    async def run_phase(self):
+        cocotb.fork(self.get_cmds())
+        cocotb.fork(self.get_results())
+
+    def check_phase(self):
+        passed = True
+        for cmd in self.cmds:
+            (aa, bb, op) = cmd
+            self.cvg.add(Ops(op))
+            actual = self.results.pop(0)
+            prediction = alu_prediction(aa, bb, Ops(op))
+            if actual == prediction:
+                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
+            else:
+                passed = False
+                logger.error(
+                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
+
+        if len(set(Ops) - self.cvg) > 0:
+            logger.error(
+                f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
+            passed = False
+        else:
+            logger.info("Covered all operations")
+        assert passed
+
+
+class RandomAluEnv(uvm_env):
+    """Instantiate the BFM and scoreboard"""
+
+    def build_phase(self):
+        dut = ConfigDB().get(self, "", "DUT")
+        bfm = TinyAluBfm(dut)
+        ConfigDB().set(None, "*", "BFM", bfm)
+        self.driver = Driver("driver", self)
+        self.tester = RandomTester("tester", self)
+        self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
+        self.scoreboard = Scoreboard("scoreboard", self)
 
     def connect_phase(self):
-        self.prod.pp.connect(self.fifo.put_export)
-        self.cons.gp.connect(self.fifo.get_export)
+        self.tester.bpp.connect(self.cmd_fifo.put_export)
+        self.driver.bgp.connect(self.cmd_fifo.get_export)
+
+
+class MaxAluEnv(RandomAluEnv):
+    """Generate maximum operands"""
+
+    def build_phase(self):
+        uvm_factory().set_type_override_by_type(RandomTester, MaxTester)
+        super().build_phase()
+
+
+class RandomTest(uvm_test):
+    """Run with random operands"""
+    def build_phase(self):
+        self.env = RandomAluEnv("env", self)
+
+
+class MaxTest(uvm_test):
+    """Run with max operands"""
+    def build_phase(self):
+        self.env = MaxAluEnv("env", self)
 
 
 @cocotb.test()
-async def blocking_fifo(dut):
-    """Blocking FIFO example"""
-    await uvm_root().run_test("BlockingFIFOTest")
-    assert True
-
-
-# Nonblocking FIFO
-
-
-class NonBlockingProducer(uvm_component):
-    def build_phase(self):
-        self.pp = uvm_put_port("pp", self)
-
-    async def run_phase(self):
-        self.raise_objection()
-        for nn in range(3):
-            success = False
-            while not success:
-                success = self.pp.try_put(nn)
-                if success:
-                    print(f"Put {nn}")
-                else:
-                    sleep_time = random.randint(1, 10)
-                    print(f"Failed to put {nn}. Sleep {sleep_time}")
-                    await Timer(sleep_time)
-        await Timer(1)
-        self.drop_objection()
-
-
-class NonBlockingConsumer(uvm_component):
-    def build_phase(self):
-        self.gp = uvm_get_port("gp", self)
-
-    async def run_phase(self):
-        while True:
-            success = False
-            while not success:
-                success, nn = self.gp.try_get()
-                if success:
-                    print(f"Got {nn}")
-                else:
-                    sleep_time = random.randint(1, 10)
-                    print(f"Failed to get. Sleep {sleep_time}")
-                    await Timer(sleep_time)
-
-
-class NonBlockingFIFOTest(uvm_test):
-    def build_phase(self):
-        self.prod = NonBlockingProducer("prod", self)
-        self.cons = NonBlockingConsumer("cons", self)
-        self.fifo = uvm_tlm_fifo("fifo", self)
-
-    def connect_phase(self):
-        self.prod.pp.connect(self.fifo.put_export)
-        self.cons.gp.connect(self.fifo.get_export)
-
-
-class Producer(uvm_component):
-    def build_phase(self):
-        self.pp = uvm_put_port("pp", self)
-
-    async def run_phase(self):
-        self.raise_objection()
-        for nn in range(5):
-            await self.pp.put(nn)
-            print(f"Put {nn}", end=" ")
-        self.drop_objection()
-
-
-class Consumer(uvm_component):
-    def build_phase(self):
-        self.gp = uvm_get_port("gp", self)
-
-    async def run_phase(self):
-        while True:
-            nn = await self.gp.get()
-            print(f"Got {nn}", end=" ")
-
-
-class FIFO_DEBUG_Test(uvm_test):
-    def build_phase(self):
-        self.prod = Producer("prod", self)
-        self.cons = Consumer("cons", self)
-        self.fifo = uvm_tlm_fifo("fifo", self)
-
-    def end_of_elaboration_phase(self):
-        self.set_logging_level_hier(FIFO_DEBUG)
-
-    def connect_phase(self):
-        self.prod.pp.connect(self.fifo.put_export)
-        self.cons.gp.connect(self.fifo.get_export)
+async def random_test(dut):
+    """Random operands"""
+    ConfigDB().set(None, "*", "DUT", dut)
+    await uvm_root().run_test("RandomTest")
 
 
 @cocotb.test()
-async def non_blocking_fifo(dut):
-    """Blocking FIFO example"""
-
-    await uvm_root().run_test("NonBlockingFIFOTest")
-    assert True
+async def max_test(dut):
+    """Maximum operands"""
+    ConfigDB().set(None, "*", "DUT", dut)
+    await uvm_root().run_test("MaxTest")
