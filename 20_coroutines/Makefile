@@ -4,7 +4,8 @@ SIM ?= icarus
 VERILOG_SOURCES =$(CWD)/clocker.sv
 MODULE := testbench
 TOPLEVEL := clocker
+TOPLEVEL_LANG=verilog
 COCOTB_HDL_TIMEUNIT=1ps
 COCOTB_HDL_TIMEPRECISION=1ps
 include $(shell cocotb-config --makefiles)/Makefile.sim
-include ../Makefile.cleanall
+include ../cleanall.mk
