@@ -6,7 +6,7 @@ import sys
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 sys.path.append(str(Path("..").resolve()))
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
 class RandomTester(uvm_component):
@@ -44,9 +44,7 @@ class Driver(uvm_driver):
         await self.bfm.start_bfms()
         while True:
             aa, bb, op = await self.bgp.get()
-            self.logger.info(f"******* SENDING op: {(aa, op.name, bb)}")
             await self.bfm.send_op(aa, bb, op)
-            self.logger.info(f"******* SENT op: {(aa, op.name, bb)}")
 
 
 class MaxTester(RandomTester):
@@ -64,49 +62,53 @@ class MaxTester(RandomTester):
         self.drop_objection()
 
 
+class Monitor(uvm_monitor):
+    def __init__(self, name, parent, method_name):
+        super().__init__(name, parent)
+        self.method_name = method_name
+
+    def build_phase(self):
+        self.ap = uvm_analysis_port("ap", self)
+        self.bfm = ConfigDB().get(self, "", "BFM")
+
+    async def run_phase(self):
+        while True:
+            get_method = getattr(self.bfm, self.method_name)
+            datum = await get_method()
+            self.ap.write(datum)
+
+
 class Scoreboard(uvm_component):
 
     def build_phase(self):
-        self.bfm = ConfigDB().get(self, "", "BFM")
-        self.cmds = []
-        self.results = []
-        self.cvg = set()
-
-    async def get_cmds(self):
-        while True:
-            cmd = await self.bfm.get_cmd()
-            self.logger.info(f"***** GOT op: {cmd}")
-            self.cmds.append(cmd)
-
-    async def get_results(self):
-        while True:
-            result = await self.bfm.get_result()
-            self.results.append(result)
-
-    async def run_phase(self):
-        cocotb.fork(self.get_cmds())
-        cocotb.fork(self.get_results())
+        self.cmd_gp = uvm_nonblocking_get_port("cmd_gp", self)
+        self.result_gp = uvm_nonblocking_get_port("result_gp", self)
 
     def check_phase(self):
         passed = True
-        for cmd in self.cmds:
+        cvg = set()
+        while True:
+            success, cmd = self.cmd_gp.try_get()
+            if not success:
+                break
             (aa, bb, op) = cmd
-            self.cvg.add(Ops(op))
-            actual = self.results.pop(0)
+            cvg.add(Ops(op))
+            result_there, actual = self.result_gp.try_get()
+            assert result_there, f"Missing result for command {cmd}"
             prediction = alu_prediction(aa, bb, Ops(op))
             if actual == prediction:
-                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
+                self.logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
             else:
                 passed = False
-                logger.error(
+                self.logger.error(
                     f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
 
-        if len(set(Ops) - self.cvg) > 0:
-            logger.error(
-                f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
+        if len(set(Ops) - cvg) > 0:
+            self.logger.error(
+                f"Functional coverage error. Missed: {set(Ops)-cvg}")
             passed = False
         else:
-            logger.info("Covered all operations")
+            self.logger.info("Covered all operations")
         assert passed
 
 
@@ -121,10 +123,18 @@ class RandomAluEnv(uvm_env):
         self.tester = RandomTester("tester", self)
         self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
         self.scoreboard = Scoreboard("scoreboard", self)
+        self.cmd_monitor = Monitor("cmd_monitor", self, "get_cmd")
+        self.result_monitor = Monitor("result_monitor", self, "get_result")
+        self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
+        self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
 
     def connect_phase(self):
         self.tester.bpp.connect(self.cmd_fifo.put_export)
         self.driver.bgp.connect(self.cmd_fifo.get_export)
+        self.cmd_monitor.ap.connect(self.cmd_mon_fifo.analysis_export)
+        self.result_monitor.ap.connect(self.result_mon_fifo.analysis_export)
+        self.scoreboard.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
+        self.scoreboard.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
 
 
 class MaxAluEnv(RandomAluEnv):
