@@ -75,6 +75,13 @@ class Scoreboard(uvm_component):
     def build_phase(self):
         self.cmd_gp = uvm_nonblocking_get_port("cmd_gp", self)
         self.result_gp = uvm_nonblocking_get_port("result_gp", self)
+        self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
+        self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
+
+    def connect_phase(self):
+        self.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
+        self.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
+        
 
     def check_phase(self):
         passed = True
@@ -85,9 +92,9 @@ class Scoreboard(uvm_component):
                 break
             (aa, bb, op) = cmd
             cvg.add(Ops(op))
-            result_there, actual = self.result_gp.try_get()
-            assert result_there, f"Missing result for command {cmd}"
             prediction = alu_prediction(aa, bb, Ops(op))
+            result_exists, actual = self.result_gp.try_get()
+            assert result_exists, f"Missing result for command {cmd}"
             if actual == prediction:
                 self.logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
             else:
@@ -117,16 +124,12 @@ class RandomAluEnv(uvm_env):
         self.scoreboard = Scoreboard("scoreboard", self)
         self.cmd_monitor = Monitor("cmd_monitor", self, "get_cmd")
         self.result_monitor = Monitor("result_monitor", self, "get_result")
-        self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
-        self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
 
     def connect_phase(self):
         self.tester.bpp.connect(self.cmd_fifo.put_export)
         self.driver.bgp.connect(self.cmd_fifo.get_export)
-        self.cmd_monitor.ap.connect(self.cmd_mon_fifo.analysis_export)
-        self.result_monitor.ap.connect(self.result_mon_fifo.analysis_export)
-        self.scoreboard.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
-        self.scoreboard.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
+        self.cmd_monitor.ap.connect(self.scoreboard.cmd_mon_fifo.analysis_export)
+        self.result_monitor.ap.connect(self.scoreboard.result_mon_fifo.analysis_export)
 
 
 class MaxAluEnv(RandomAluEnv):
