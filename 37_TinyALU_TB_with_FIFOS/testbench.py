@@ -9,28 +9,35 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
-class RandomTester(uvm_component):
+class BaseTester(uvm_component):
 
     def build_phase(self):
         self.bpp = uvm_blocking_put_port("bpp", self)
 
-    async def until_done(self):
-        await self.bpp.put((0, 0, Ops.ADD))
-        await self.bpp.put((0, 0, Ops.ADD))
-        await self.bpp.put((0, 0, Ops.ADD))
-        await self.bpp.put((0, 0, Ops.ADD))
+    def create_operands(self):
+        return (0, 0)
 
     async def run_phase(self):
         self.raise_objection()
         ops = list(Ops)
         for op in ops:
-            aa = random.randint(0, 255)
-            bb = random.randint(0, 255)
+            aa, bb = self.create_operands()
             await self.bpp.put((aa, bb, op))
-        # send two dummy operations to allow
-        # last real operation to complete
-        await self.until_done()
+        await self.bpp.put((0, 0, Ops.ADD))
+        await self.bpp.put((0, 0, Ops.ADD))
+        await self.bpp.put((0, 0, Ops.ADD))
+        await self.bpp.put((0, 0, Ops.ADD))
         self.drop_objection()
+
+
+class RandomTester(BaseTester):
+    def create_operands(self):
+        return (random.randint(0, 255), random.randint(0, 255))
+
+
+class MaxTester(BaseTester):
+    def create_operands(self):
+        return (0xFF, 0xFF)
 
 
 class Driver(uvm_driver):
@@ -45,21 +52,6 @@ class Driver(uvm_driver):
         while True:
             aa, bb, op = await self.bgp.get()
             await self.bfm.send_op(aa, bb, op)
-
-
-class MaxTester(RandomTester):
-
-    async def run_phase(self):
-        self.raise_objection()
-        ops = list(Ops)
-        for op in ops:
-            aa = 0xFF
-            bb = 0xFF
-            await self.bpp.put((aa, bb, op))
-        # send two dummy operations to allow
-        # last real operation to complete
-        await self.until_done()
-        self.drop_objection()
 
 
 class Monitor(uvm_monitor):
