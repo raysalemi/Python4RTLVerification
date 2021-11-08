@@ -70,6 +70,24 @@ class Monitor(uvm_monitor):
             self.ap.write(datum)
 
 
+class Coverage(uvm_analysis_export):
+    def start_of_simulation_phase(self):
+        self.cvg = set()
+
+    def write(self, cmd):
+        _, _, op = cmd
+        self.cvg.add(Ops(op))
+
+    def report_phase(self):
+        if len(set(Ops) - self.cvg) > 0:
+            self.logger.error(
+                f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
+            assert False
+        else:
+            self.logger.info("Covered all operations")
+            assert True
+
+
 class Scoreboard(uvm_component):
 
     def build_phase(self):
@@ -81,17 +99,14 @@ class Scoreboard(uvm_component):
     def connect_phase(self):
         self.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
         self.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
-        
 
     def check_phase(self):
         passed = True
-        cvg = set()
         while True:
             success, cmd = self.cmd_gp.try_get()
             if not success:
                 break
             (aa, bb, op) = cmd
-            cvg.add(Ops(op))
             prediction = alu_prediction(aa, bb, Ops(op))
             result_exists, actual = self.result_gp.try_get()
             assert result_exists, f"Missing result for command {cmd}"
@@ -101,13 +116,6 @@ class Scoreboard(uvm_component):
                 passed = False
                 self.logger.error(
                     f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
-
-        if len(set(Ops) - cvg) > 0:
-            self.logger.error(
-                f"Functional coverage error. Missed: {set(Ops)-cvg}")
-            passed = False
-        else:
-            self.logger.info("Covered all operations")
         assert passed
 
 
@@ -122,6 +130,7 @@ class RandomAluEnv(uvm_env):
         self.tester = RandomTester("tester", self)
         self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
         self.scoreboard = Scoreboard("scoreboard", self)
+        self.coverage = Coverage("coverage", self)
         self.cmd_monitor = Monitor("cmd_monitor", self, "get_cmd")
         self.result_monitor = Monitor("result_monitor", self, "get_result")
 
@@ -130,6 +139,8 @@ class RandomAluEnv(uvm_env):
         self.driver.bgp.connect(self.cmd_fifo.get_export)
         self.cmd_monitor.ap.connect(self.scoreboard.cmd_mon_fifo.analysis_export)
         self.result_monitor.ap.connect(self.scoreboard.result_mon_fifo.analysis_export)
+
+        self.cmd_monitor.ap.connect(self.coverage)
 
 
 class MaxAluEnv(RandomAluEnv):
