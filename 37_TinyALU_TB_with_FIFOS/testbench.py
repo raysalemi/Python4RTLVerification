@@ -91,12 +91,16 @@ class Coverage(uvm_analysis_export):
 class Scoreboard(uvm_component):
 
     def build_phase(self):
+        self.cmd_export = uvm_analysis_export("cmd_export", self)
+        self.result_export = uvm_analysis_export("result_export", self)
         self.cmd_gp = uvm_nonblocking_get_port("cmd_gp", self)
         self.result_gp = uvm_nonblocking_get_port("result_gp", self)
         self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
         self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
 
     def connect_phase(self):
+        self.cmd_export.connect(self.cmd_mon_fifo.analysis_export)
+        self.result_export.connect(self.result_mon_fifo.analysis_export)
         self.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
         self.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
 
@@ -137,8 +141,8 @@ class RandomAluEnv(uvm_env):
     def connect_phase(self):
         self.tester.bpp.connect(self.cmd_fifo.put_export)
         self.driver.bgp.connect(self.cmd_fifo.get_export)
-        self.cmd_monitor.ap.connect(self.scoreboard.cmd_mon_fifo.analysis_export)
-        self.result_monitor.ap.connect(self.scoreboard.result_mon_fifo.analysis_export)
+        self.cmd_monitor.ap.connect(self.scoreboard.cmd_export)
+        self.result_monitor.ap.connect(self.scoreboard.result_export)
 
         self.cmd_monitor.ap.connect(self.coverage)
 
