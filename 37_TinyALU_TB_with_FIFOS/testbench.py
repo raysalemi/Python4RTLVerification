@@ -93,10 +93,10 @@ class Scoreboard(uvm_component):
     def build_phase(self):
         self.cmd_export = uvm_analysis_export("cmd_export", self)
         self.result_export = uvm_analysis_export("result_export", self)
-        self.cmd_gp = uvm_nonblocking_get_port("cmd_gp", self)
-        self.result_gp = uvm_nonblocking_get_port("result_gp", self)
         self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
         self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
+        self.cmd_gp = uvm_nonblocking_get_port("cmd_gp", self)
+        self.result_gp = uvm_nonblocking_get_port("result_gp", self)
 
     def connect_phase(self):
         self.cmd_export.connect(self.cmd_mon_fifo.analysis_export)
@@ -113,58 +113,53 @@ class Scoreboard(uvm_component):
             (aa, bb, op) = cmd
             prediction = alu_prediction(aa, bb, Ops(op))
             result_exists, actual = self.result_gp.try_get()
-            assert result_exists, f"Missing result for command {cmd}"
+            if not result_exists:
+                raise RuntimeError(f"Missing result for command {cmd}")
             if actual == prediction:
-                self.logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
+                self.logger.info(f"PASSED: {aa:x} {Ops(op).name} {bb:x} = {actual:x}")
             else:
                 passed = False
                 self.logger.error(
-                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa:x} {Ops(op).name} {bb:x} = {actual:x} - predicted {prediction:x}")
         assert passed
 
 
-class RandomAluEnv(uvm_env):
+class Environment(uvm_env):
     """Instantiate the BFM and scoreboard"""
 
     def build_phase(self):
         dut = ConfigDB().get(self, "", "DUT")
         bfm = TinyAluBfm(dut)
         ConfigDB().set(None, "*", "BFM", bfm)
+        self.tester = RandomTester.create("tester", self)
         self.driver = Driver("driver", self)
-        self.tester = RandomTester("tester", self)
         self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
         self.scoreboard = Scoreboard("scoreboard", self)
         self.coverage = Coverage("coverage", self)
-        self.cmd_monitor = Monitor("cmd_monitor", self, "get_cmd")
-        self.result_monitor = Monitor("result_monitor", self, "get_result")
+        self.cmd_mon = Monitor("cmd_monitor", self, "get_cmd")
+        self.result_mon = Monitor("result_monitor", self, "get_result")
 
     def connect_phase(self):
         self.tester.bpp.connect(self.cmd_fifo.put_export)
         self.driver.bgp.connect(self.cmd_fifo.get_export)
-        self.cmd_monitor.ap.connect(self.scoreboard.cmd_export)
-        self.result_monitor.ap.connect(self.scoreboard.result_export)
 
-        self.cmd_monitor.ap.connect(self.coverage)
+        self.cmd_mon.ap.connect(self.coverage)
+        self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
 
-
-class MaxAluEnv(RandomAluEnv):
-    """Generate maximum operands"""
-
-    def build_phase(self):
-        uvm_factory().set_type_override_by_type(RandomTester, MaxTester)
-        super().build_phase()
+        self.result_mon.ap.connect(self.scoreboard.result_export)
 
 
 class RandomTest(uvm_test):
     """Run with random operands"""
     def build_phase(self):
-        self.env = RandomAluEnv("env", self)
+        self.env = Environment("env", self)
 
 
 class MaxTest(uvm_test):
     """Run with max operands"""
     def build_phase(self):
-        self.env = MaxAluEnv("env", self)
+        uvm_factory().set_type_override_by_type(RandomTester, MaxTester)
+        self.env = Environment("env", self)
 
 
 @cocotb.test()
