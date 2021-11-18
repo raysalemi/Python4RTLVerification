@@ -1,251 +1,188 @@
-import cocotb
-from cocotb.triggers import Join, Combine
 from pyuvm import *
+from cocotb.triggers import ClockCycles
+import random
+# All testbenches use tinyalu_utils, so store it in a central
+# place and add its path to the sys path so we can import it
+import sys
+from pathlib import Path
+sys.path.append(str(Path("..").resolve()))
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
-# Basic Sequence Operation
+class AluSeqItem(uvm_sequence_item):
 
-
-class SeqItem(uvm_sequence_item):
-    def __init__(self, name):
+    def __init__(self, name, aa=0, bb=0, op=Ops.ADD):
         super().__init__(name)
-        self.numb = self.result = None
+        self.A = aa
+        self.B = bb
+        self.op = Ops(op)
+
+    def __eq__(self, other):
+        same = self.A == other.A and self.B == other.B and self.op == other.op
+        return same
 
     def __str__(self):
-        return f"numb: {self.numb}   result: {self.result}"
+        return f"{self.get_name()} : A: 0x{self.A:02x} \
+        OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
+
+    def randomize(self):
+        self.A = random.randint(0, 255)
+        self.B = random.randint(0, 255)
+        self.op = random.choice(list(Ops))
 
 
-class SeqDriver(uvm_driver):
+class AluSeq(uvm_sequence):
+    async def body(self):
+        for op in list(Ops):
+            cmd_tr = AluSeqItem("cmd_tr")
+            await self.start_item(cmd_tr)
+            cmd_tr.randomize()
+            cmd_tr.op = op
+            await self.finish_item(cmd_tr)
+
+
+class MaxSeq(uvm_sequence):
+    async def body(self):
+        for op in list(Ops):
+            cmd_tr = AluSeqItem("cmd_tr")
+            await self.start_item(cmd_tr)
+            cmd_tr.A = 0xff
+            cmd_tr.B = 0xff
+            cmd_tr.op = op
+            await self.finish_item(cmd_tr)
+
+
+class Driver(uvm_driver):
+    def start_of_simulation_phase(self):
+        self.bfm = self.cdb_get("BFM")
+
     async def run_phase(self):
+        await self.bfm.reset()
+        await self.bfm.start_bfms()
         while True:
-            op_item = await self.seq_item_port.get_next_item()
-            op_item.result = op_item.numb + 1
+            cmd = await self.seq_item_port.get_next_item()
+            await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
+            self.logger.debug(f"Sent command: {cmd}")
             self.seq_item_port.item_done()
 
 
-class Seq(uvm_sequence):
-    async def body(self):
-        for nn in range(5):
-            op = SeqItem("op")
-            await self.start_item(op)
-            op.numb = nn
-            await self.finish_item(op)
-            print(op)
+class Coverage(uvm_subscriber):
+
+    def end_of_elaboration_phase(self):
+        self.cvg = set()
+
+    def write(self, cmd):
+        (_, _, op) = cmd
+        self.cvg.add(op)
+
+    def check_phase(self):
+        if len(set(Ops) - self.cvg) > 0:
+            self.logger.error(f"Functional coverage error. "
+                              f"Missed: {set(Ops)-self.cvg}")
 
 
-class SeqTest(uvm_test):
+class Scoreboard(uvm_component):
+
     def build_phase(self):
-        self.seqr = uvm_sequencer("seqr", self)
-        self.drvr = SeqDriver("drvr", self)
+        self.cmd_fifo = uvm_tlm_analysis_fifo("cmd_fifo", self)
+        self.result_fifo = uvm_tlm_analysis_fifo("result_fifo", self)
+        self.cmd_get_port = uvm_get_port("cmd_get_port", self)
+        self.result_get_port = uvm_get_port("result_get_port", self)
+        self.cmd_export = self.cmd_fifo.analysis_export
+        self.result_export = self.result_fifo.analysis_export
 
     def connect_phase(self):
-        self.drvr.seq_item_port.connect(self.seqr.seq_item_export)
+        self.cmd_get_port.connect(self.cmd_fifo.get_export)
+        self.result_get_port.connect(self.result_fifo.get_export)
 
-    async def run_phase(self):
-        self.raise_objection()
-        self.seq = Seq.create("seq")
-        await self.seq.start(self.seqr)
-        self.drop_objection()
-
-
-@cocotb.test()
-async def sequences(dut):
-    """Demonstrate basic sequence usage"""
-    await uvm_root().run_test("SeqTest")
-    assert True
-
-
-# Virtual sequences with Hello World
-
-class HelloSeq(uvm_sequence):
-    async def body(self):
-        print("Hello World")
-
-
-class HelloTest(uvm_test):
-    async def run_phase(self):
-        self.raise_objection()
-        self.hello = HelloSeq("hello")
-        await self.hello.start()
-        self.drop_objection()
+    def check_phase(self):
+        while self.result_get_port.can_get():
+            _, actual_result = self.result_get_port.try_get()
+            cmd_success, cmd = self.cmd_get_port.try_get()
+            if not cmd_success:
+                self.logger.critical(f"result {actual_result} had no command")
+            else:
+                (A, B, op_numb) = cmd
+                op = Ops(op_numb)
+                predicted_result = alu_prediction(A, B, op)
+                if predicted_result == actual_result:
+                    self.logger.info(f"PASSED: 0x{A:02x} {op.name} 0x{B:02x} ="
+                                     f" 0x{actual_result:04x}")
+                else:
+                    self.logger.error(f"FAILED: 0x{A:02x} {op.name} 0x{B:02x} "
+                                      f"= 0x{actual_result:04x} "
+                                      f"expected 0x{predicted_result:04x}")
 
 
-@cocotb.test()
-async def virtual_sequence(dut):
-    """Demonstrate virtual sequences"""
-    await uvm_root().run_test("HelloTest")
-    assert True
+class Monitor(uvm_component):
+    def __init__(self, name, parent, method_name):
+        super().__init__(name, parent)
+        self.method_name = method_name
 
-
-# Virtual Sequence Requirements Example (DO-254)
-
-
-class Req_1101(uvm_sequence):
-    async def body(self):
-        print("Testing 1101")
-
-
-class Req_2222(uvm_sequence):
-    async def body(self):
-        print("Testing 2222")
-
-
-class ReqTestSeq(uvm_sequence):
-    async def body(self):
-        for req in ["1101", "2222"]:
-            seq_name = "Req_" + req
-            seq = uvm_factory().create_object_by_name(seq_name)
-            await seq.start()
-
-
-class ReqTest(uvm_test):
-    async def run_phase(self):
-        self.raise_objection()
-        self.req_test = ReqTestSeq("req_test")
-        await self.req_test.start()
-        self.drop_objection()
-
-
-@cocotb.test()
-async def do254_sequence(dut):
-    """Demonstrate requirements-driven testing"""
-    await uvm_root().run_test("ReqTest")
-    assert True
-
-
-# Demonstrate passing a sequencer
-
-
-class IncSeq(uvm_sequence):
-    async def body(self):
-        print("count up")
-        for nn in range(3):
-            op = SeqItem("op")
-            await self.start_item(op)
-            op.numb = nn
-            await self.finish_item(op)
-            print("Inc", op)
-
-
-class DecSeq(uvm_sequence):
-    async def body(self):
-        print("count down")
-        for nn in range(2, -1, -1):
-            op = SeqItem("op")
-            await self.start_item(op)
-            op.numb = nn
-            await self.finish_item(op)
-            print("Dec", op)
-
-
-class TopSeq(uvm_sequence):
-    async def body(self):
-        seqr = ConfigDB().get(None, "", "SEQR")
-        inc = IncSeq("inc")
-        await inc.start(seqr)
-        dec = DecSeq("dec")
-        await dec.start(seqr)
-
-
-class TopSeqTest(uvm_test):
     def build_phase(self):
-        self.seqr = uvm_sequencer("seqr", self)
-        self.drvr = SeqDriver("drvr", self)
-        ConfigDB().set(None, "*", "SEQR", self.seqr)
+        self.ap = uvm_analysis_port("ap", self)
 
     def connect_phase(self):
-        self.drvr.seq_item_port.connect(self.seqr.seq_item_export)
+        self.bfm = self.cdb_get("BFM")
 
-    async def run_phase(self):
-        self.raise_objection()
-        self.top = TopSeq("top")
-        await self.top.start()
-        self.drop_objection()
-
-
-@cocotb.test()
-async def pass_sequencer(dut):
-    """Demonstrate passing a sequencer"""
-    await uvm_root().run_test("TopSeqTest")
-    assert True
-
-
-# Forking sequences
-
-class ForkSeq(uvm_sequence):
-    async def body(self):
-        seqr = ConfigDB().get(None, "", "SEQR")
-        inc = IncSeq("inc")
-        dec = DecSeq("dec")
-        inc_co = cocotb.fork(inc.start(seqr))
-        dec_co = cocotb.fork(dec.start(seqr))
-        await Combine(Join(inc_co), Join(dec_co))
-
-
-class ForkSeqTest(uvm_test):
-    def build_phase(self):
-        self.seqr = uvm_sequencer("seqr", self)
-        self.drvr = SeqDriver("drvr", self)
-        ConfigDB().set(None, "*", "SEQR", self.seqr)
-
-    def connect_phase(self):
-        self.drvr.seq_item_port.connect(self.seqr.seq_item_export)
-
-    async def run_phase(self):
-        self.raise_objection()
-        self.fork = ForkSeq("fork")
-        await self.fork.start()
-        self.drop_objection()
-
-
-@cocotb.test()
-async def fork_sequences(dut):
-    """Demonstrate running sequences in parallel"""
-    await uvm_root().run_test("ForkSeqTest")
-    assert True
-
-
-# Returning data using item_done
-
-
-class ItemDoneSeqDriver(uvm_driver):
     async def run_phase(self):
         while True:
-            op_item = await self.seq_item_port.get_next_item()
-            return_item = SeqItem("return_item")
-            return_item.result = op_item.numb + 1
-            return_item.set_context(op_item)
-            self.seq_item_port.item_done(return_item)
+            get_method = getattr(self.bfm, self.method_name)
+            datum = await get_method()
+            self.ap.write(datum)
 
 
-class ItemDoneSeq(uvm_sequence):
-    async def body(self):
-        for nn in range(5):
-            op = SeqItem("op")
-            await self.start_item(op)
-            op.numb = nn
-            await self.finish_item(op)
-            return_item = await self.get_response()
-            print("Returned", return_item)
+class AluEnv(uvm_env):
 
-
-class ItemDoneTest(uvm_test):
     def build_phase(self):
         self.seqr = uvm_sequencer("seqr", self)
-        self.drvr = ItemDoneSeqDriver("drvr", self)
+        ConfigDB().set(None, "*", "SEQR", self.seqr)
+        self.driver = Driver("driver", self)
+        self.cmd_mon = Monitor("cmd_mon", self, "get_cmd")
+        self.result_mon = Monitor("result_mon", self, "get_result")
+        self.scoreboard = Scoreboard("scoreboard", self)
+        self.coverage = Coverage("coverage", self)
 
     def connect_phase(self):
-        self.drvr.seq_item_port.connect(self.seqr.seq_item_export)
+        self.driver.seq_item_port.connect(self.seqr.seq_item_export)
+        self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
+        self.cmd_mon.ap.connect(self.coverage.analysis_export)
+        self.result_mon.ap.connect(self.scoreboard.result_export)
+
+
+class AluTest(uvm_test):
+    def build_phase(self):
+        self.env = AluEnv.create("env", self)
+
+    def end_of_elaboration_phase(self):
+        self.seqr = ConfigDB().get(self, "", "SEQR")
+        self.bfm = ConfigDB().get(self, "", "BFM")
 
     async def run_phase(self):
         self.raise_objection()
-        self.seq = ItemDoneSeq.create("seq")
-        await self.seq.start(self.seqr)
+        seq = AluSeq.create("seq")
+        await seq.start(self.seqr)
+        await ClockCycles(self.bfm.dut.clk, 50)  # to do last transaction
         self.drop_objection()
 
 
+class MaxAluTest(AluTest):
+    def start_of_simulation_phase(self):
+        uvm_factory().set_type_override_by_type(AluSeq, MaxSeq)
+
+
 @cocotb.test()
-async def item_done_ret(dut):
-    """Demonstrate returning data using item_done"""
-    await uvm_root().run_test("ItemDoneTest")
-    assert True
+async def test_alu(dut):
+    bfm = TinyAluBfm(dut)
+    ConfigDB().set(None, "*", "BFM", bfm)
+    await bfm.start_bfms()
+    await uvm_root().run_test("AluTest")
+
+
+@cocotb.test()
+async def max_test_alu(dut):
+    """Test alu with maximum values"""
+    bfm = TinyAluBfm(dut)
+    ConfigDB().set(None, "*", "BFM", bfm)
+    await bfm.start_bfms()
+    await uvm_root().run_test("MaxAluTest")
