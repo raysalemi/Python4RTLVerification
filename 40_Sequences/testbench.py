@@ -11,11 +11,19 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 class AluSeqItem(uvm_sequence_item):
 
-    def __init__(self, name, aa=0, bb=0, op=Ops.ADD):
+    def __init__(self, name, aa, bb, op):
         super().__init__(name)
         self.A = aa
         self.B = bb
         self.op = Ops(op)
+
+    def randomize_operands(self):
+        self.A = random.randint(0, 255)
+        self.B = random.randint(0, 255)
+
+    def randomize(self):
+        self.randomize_operands()
+        self.op = random.choice(list(Ops))
 
     def __eq__(self, other):
         same = self.A == other.A and self.B == other.B and self.op == other.op
@@ -25,30 +33,22 @@ class AluSeqItem(uvm_sequence_item):
         return f"{self.get_name()} : A: 0x{self.A:02x} \
         OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
 
-    def randomize(self):
-        self.A = random.randint(0, 255)
-        self.B = random.randint(0, 255)
-        self.op = random.choice(list(Ops))
 
-
-class AluSeq(uvm_sequence):
+class RandomSeq(uvm_sequence):
     async def body(self):
         for op in list(Ops):
-            cmd_tr = AluSeqItem("cmd_tr")
+            op = Ops(1)
+            cmd_tr = AluSeqItem("cmd_tr", None, None, op)
             await self.start_item(cmd_tr)
-            cmd_tr.randomize()
-            cmd_tr.op = op
+            cmd_tr.randomize_operands()
             await self.finish_item(cmd_tr)
 
 
 class MaxSeq(uvm_sequence):
     async def body(self):
         for op in list(Ops):
-            cmd_tr = AluSeqItem("cmd_tr")
+            cmd_tr = AluSeqItem("cmd_tr", 0xff, 0xff, op)
             await self.start_item(cmd_tr)
-            cmd_tr.A = 0xff
-            cmd_tr.B = 0xff
-            cmd_tr.op = op
             await self.finish_item(cmd_tr)
 
 
@@ -61,8 +61,9 @@ class Driver(uvm_driver):
         await self.bfm.start_bfms()
         while True:
             cmd = await self.seq_item_port.get_next_item()
+            self.logger.debug(f"GOT command: {cmd}")
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
-            self.logger.debug(f"Sent command: {cmd}")
+            self.logger.debug(f"SENT command: {cmd}")
             self.seq_item_port.item_done()
 
 
@@ -117,18 +118,16 @@ class Scoreboard(uvm_component):
 class Monitor(uvm_component):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
-        self.method_name = method_name
+        self.bfm = self.cdb_get("BFM")
+        self.get_method = getattr(self.bfm, method_name)
 
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
 
-    def connect_phase(self):
-        self.bfm = self.cdb_get("BFM")
-
     async def run_phase(self):
         while True:
-            get_method = getattr(self.bfm, self.method_name)
-            datum = await get_method()
+            datum = await self.get_method()
+            self.logger.debug(f"MONITORED {datum}")
             self.ap.write(datum)
 
 
@@ -150,9 +149,9 @@ class AluEnv(uvm_env):
         self.result_mon.ap.connect(self.scoreboard.result_export)
 
 
-class AluTest(uvm_test):
+class RandomAluTest(uvm_test):
     def build_phase(self):
-        self.env = AluEnv.create("env", self)
+        self.env = AluEnv("env", self)
 
     def end_of_elaboration_phase(self):
         self.seqr = ConfigDB().get(self, "", "SEQR")
@@ -160,29 +159,28 @@ class AluTest(uvm_test):
 
     async def run_phase(self):
         self.raise_objection()
-        seq = AluSeq.create("seq")
+        seq = RandomSeq.create("seq")
         await seq.start(self.seqr)
         await ClockCycles(self.bfm.dut.clk, 50)  # to do last transaction
         self.drop_objection()
 
 
-class MaxAluTest(AluTest):
+
+class MaxAluTest(RandomAluTest):
     def start_of_simulation_phase(self):
-        uvm_factory().set_type_override_by_type(AluSeq, MaxSeq)
+        uvm_factory().set_type_override_by_type(RandomSeq, MaxSeq)
 
 
 @cocotb.test()
-async def test_alu(dut):
+async def random_alu_test(dut):
+    """Use randomized operands"""
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
-    await bfm.start_bfms()
-    await uvm_root().run_test("AluTest")
-
+    await uvm_root().run_test("RandomAluTest")
 
 @cocotb.test()
 async def max_test_alu(dut):
-    """Test alu with maximum values"""
+    """Use maximum operands"""
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
-    await bfm.start_bfms()
     await uvm_root().run_test("MaxAluTest")
