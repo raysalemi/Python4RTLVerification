@@ -1,5 +1,4 @@
 from pyuvm import *
-from cocotb.triggers import ClockCycles
 import random
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
@@ -45,7 +44,7 @@ class AluResultItem(uvm_sequence_item):
 
 class Driver(uvm_driver):
     def build_phase(self):
-        self.result_ap = uvm_analysis_port("result_ap", self)
+        self.ap = uvm_analysis_port("ap", self)
 
     def start_of_simulation_phase(self):
         self.bfm = self.cdb_get("BFM")
@@ -60,7 +59,7 @@ class Driver(uvm_driver):
             cmd = await self.seq_item_port.get_next_item()
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
             result = await self.bfm.get_result()
-            self.result_ap.write(result)
+            self.ap.write(result)
             cmd.result = result
             self.seq_item_port.item_done()
 
@@ -72,7 +71,7 @@ class ResponseDriver(Driver):
             cmd = await self.seq_item_port.get_next_item()
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
             result = await self.bfm.get_result()
-            self.result_ap.write(result)
+            self.ap.write(result)
             result_item = AluResultItem("result_item", result)
             result_item.set_id_info(cmd)
             self.seq_item_port.item_done(result_item)
@@ -82,6 +81,10 @@ class Coverage(uvm_subscriber):
 
     def end_of_elaboration_phase(self):
         self.cvg = set()
+        try:
+            self.disable_errors = ConfigDB().get(self, "", "DISABLE_COVERAGE_ERRORS")
+        except UVMConfigItemNotFound:
+            self.disable_errors = False
 
     def write(self, cmd):
         (_, _, op) = cmd
@@ -91,7 +94,7 @@ class Coverage(uvm_subscriber):
         if len(set(Ops) - self.cvg) > 0:
             self.logger.error(
                 f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
-            assert False
+            assert self.disable_errors or False
         else:
             self.logger.info("Covered all operations")
             assert True
@@ -153,12 +156,14 @@ class AluEnv(uvm_env):
         ConfigDB().set(None, "*", "SEQR", self.seqr)
         self.driver = Driver.create("driver", self)
         self.cmd_mon = Monitor("cmd_mon", self, "get_cmd")
+        self.coverage = Coverage("coverage", self)
         self.scoreboard = Scoreboard("scoreboard", self)
 
     def connect_phase(self):
         self.driver.seq_item_port.connect(self.seqr.seq_item_export)
         self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
-        self.driver.result_ap.connect(self.scoreboard.result_export)
+        self.cmd_mon.ap.connect(self.coverage.analysis_export)
+        self.driver.ap.connect(self.scoreboard.result_export)
 
 
 class FibonacciSeq(uvm_sequence):
@@ -204,15 +209,14 @@ class FibonacciTest(uvm_test):
 
     def end_of_elaboration_phase(self):
         self.seqr = ConfigDB().get(self, "", "SEQR")
-        self.bfm = ConfigDB().get(self, "", "BFM")
         ConfigDB().set(None, "*", "LOGGER", self.logger)
-        self.env.scoreboard.set_logging_level(ERROR)
+        self.env.set_logging_level_hier(CRITICAL)
+        ConfigDB().set(None, "*", "DISABLE_COVERAGE_ERRORS", True)
 
     async def run_phase(self):
         self.raise_objection()
         seq = FibonacciSeq.create("seq")
         await seq.start(self.seqr)
-        await ClockCycles(self.bfm.dut.clk, 50)  # to do last transaction
         self.drop_objection()
 
 
