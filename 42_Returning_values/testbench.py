@@ -42,6 +42,7 @@ class AluResultItem(uvm_sequence_item):
     def __str__(self):
         return f"RESULT: {self.result}"
 
+
 class Driver(uvm_driver):
     def build_phase(self):
         self.result_ap = uvm_analysis_port("result_ap", self)
@@ -166,7 +167,7 @@ class FibonacciSeq(uvm_sequence):
         cur_num = 1
         fib_list = [prev_num, cur_num]
         cmd = AluSeqItem("cmd", None, None, Ops.ADD)
-        for _ in range (7):
+        for _ in range(7):
             await self.start_item(cmd)
             cmd.A = prev_num
             cmd.B = cur_num
@@ -184,7 +185,7 @@ class ResponseFibSeq(uvm_sequence):
         cur_num = 1
         fib_list = [prev_num, cur_num]
         cmd = AluSeqItem("cmd", None, None, Ops.ADD)
-        for _ in range (7):
+        for _ in range(7):
             await self.start_item(cmd)
             cmd.A = prev_num
             cmd.B = cur_num
@@ -229,11 +230,10 @@ async def fibonacci_test(dut):
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("FibonacciTest")
 
+
 @cocotb.test()
 async def response_fib_test(dut):
     """Show get_response"""
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("ResponseFibTest")
-
-
