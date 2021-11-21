@@ -34,36 +34,47 @@ class AluSeqItem(uvm_sequence_item):
         OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
 
 
-class RandomSeq(uvm_sequence):
-    async def body(self):
-        for op in list(Ops):
-            cmd_tr = AluSeqItem("cmd_tr", None, None, op)
-            await self.start_item(cmd_tr)
-            cmd_tr.randomize_operands()
-            await self.finish_item(cmd_tr)
+class AluResultItem(uvm_sequence_item):
+    def __init__(self, name, result):
+        super().__init__(name)
+        self.result = result
 
-
-class MaxSeq(uvm_sequence):
-    async def body(self):
-        for op in list(Ops):
-            cmd_tr = AluSeqItem("cmd_tr", 0xff, 0xff, op)
-            await self.start_item(cmd_tr)
-            await self.finish_item(cmd_tr)
-
+    def __str__(self):
+        return f"RESULT: {self.result}"
 
 class Driver(uvm_driver):
+    def build_phase(self):
+        self.result_ap = uvm_analysis_port("result_ap", self)
+
     def start_of_simulation_phase(self):
         self.bfm = self.cdb_get("BFM")
 
-    async def run_phase(self):
+    async def launch_tb(self):
         await self.bfm.reset()
         await self.bfm.start_bfms()
+
+    async def run_phase(self):
+        await self.launch_tb()
         while True:
             cmd = await self.seq_item_port.get_next_item()
-            self.logger.debug(f"GOT command: {cmd}")
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
-            self.logger.debug(f"SENT command: {cmd}")
+            result = await self.bfm.get_result()
+            self.result_ap.write(result)
+            cmd.result = result
             self.seq_item_port.item_done()
+
+
+class ResponseDriver(Driver):
+    async def run_phase(self):
+        await self.launch_tb()
+        while True:
+            cmd = await self.seq_item_port.get_next_item()
+            await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
+            result = await self.bfm.get_result()
+            self.result_ap.write(result)
+            result_item = AluResultItem("result_item", result)
+            result_item.set_id_info(cmd)
+            self.seq_item_port.item_done(result_item)
 
 
 class Coverage(uvm_subscriber):
@@ -139,51 +150,90 @@ class AluEnv(uvm_env):
     def build_phase(self):
         self.seqr = uvm_sequencer("seqr", self)
         ConfigDB().set(None, "*", "SEQR", self.seqr)
-        self.driver = Driver("driver", self)
+        self.driver = Driver.create("driver", self)
         self.cmd_mon = Monitor("cmd_mon", self, "get_cmd")
-        self.result_mon = Monitor("result_mon", self, "get_result")
         self.scoreboard = Scoreboard("scoreboard", self)
-        self.coverage = Coverage("coverage", self)
 
     def connect_phase(self):
         self.driver.seq_item_port.connect(self.seqr.seq_item_export)
         self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
-        self.cmd_mon.ap.connect(self.coverage.analysis_export)
-        self.result_mon.ap.connect(self.scoreboard.result_export)
+        self.driver.result_ap.connect(self.scoreboard.result_export)
 
 
-class RandomAluTest(uvm_test):
+class FibonacciSeq(uvm_sequence):
+    async def body(self):
+        prev_num = 0
+        cur_num = 1
+        fib_list = [prev_num, cur_num]
+        cmd = AluSeqItem("cmd", None, None, Ops.ADD)
+        for _ in range (7):
+            await self.start_item(cmd)
+            cmd.A = prev_num
+            cmd.B = cur_num
+            await self.finish_item(cmd)
+            fib_list.append(cmd.result)
+            prev_num = cur_num
+            cur_num = cmd.result
+        logger = ConfigDB().get(None, "", "LOGGER")
+        logger.info("Fibonacci Sequence: " + str(fib_list))
+
+
+class ResponseFibSeq(uvm_sequence):
+    async def body(self):
+        prev_num = 0
+        cur_num = 1
+        fib_list = [prev_num, cur_num]
+        cmd = AluSeqItem("cmd", None, None, Ops.ADD)
+        for _ in range (7):
+            await self.start_item(cmd)
+            cmd.A = prev_num
+            cmd.B = cur_num
+            await self.finish_item(cmd)
+            rsp = await self.get_response()
+            fib_list.append(rsp.result)
+            prev_num = cur_num
+            cur_num = rsp.result
+        logger = ConfigDB().get(None, "", "LOGGER")
+        logger.info("Fibonacci Sequence: " + str(fib_list))
+
+
+class FibonacciTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv("env", self)
 
     def end_of_elaboration_phase(self):
         self.seqr = ConfigDB().get(self, "", "SEQR")
         self.bfm = ConfigDB().get(self, "", "BFM")
+        ConfigDB().set(None, "*", "LOGGER", self.logger)
+        self.env.scoreboard.set_logging_level(ERROR)
 
     async def run_phase(self):
         self.raise_objection()
-        seq = RandomSeq.create("seq")
+        seq = FibonacciSeq.create("seq")
         await seq.start(self.seqr)
         await ClockCycles(self.bfm.dut.clk, 50)  # to do last transaction
         self.drop_objection()
 
 
-class MaxAluTest(RandomAluTest):
-    def start_of_simulation_phase(self):
-        uvm_factory().set_type_override_by_type(RandomSeq, MaxSeq)
+class ResponseFibTest(FibonacciTest):
+    def build_phase(self):
+        uvm_factory().set_type_override_by_type(Driver, ResponseDriver)
+        uvm_factory().set_type_override_by_type(FibonacciSeq, ResponseFibSeq)
+        super().build_phase()
 
 
 @cocotb.test()
-async def random_alu_test(dut):
-    """Use randomized operands"""
+async def fibonacci_test(dut):
+    """Run Fibonacci sequence"""
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
-    await uvm_root().run_test("RandomAluTest")
-
+    await uvm_root().run_test("FibonacciTest")
 
 @cocotb.test()
-async def max_test_alu(dut):
-    """Use maximum operands"""
+async def response_fib_test(dut):
+    """Show get_response"""
     bfm = TinyAluBfm(dut)
     ConfigDB().set(None, "*", "BFM", bfm)
-    await uvm_root().run_test("MaxAluTest")
+    await uvm_root().run_test("ResponseFibTest")
+
+

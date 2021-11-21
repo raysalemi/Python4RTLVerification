@@ -10,3 +10,4 @@ put.txt
 modelsim.ini
 transcript
 *.egg-info
+*.code-workspace
