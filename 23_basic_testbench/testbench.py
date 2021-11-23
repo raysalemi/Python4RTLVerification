@@ -19,14 +19,17 @@ async def alu_test(dut):
     await FallingEdge(dut.clk)
     dut.reset_n <= 1
     cmd_count = 1
-    while cmd_count <= 4:
+    op_list = list(Ops)
+    op_list.pop(0)
+    num_ops = len(op_list)
+    while cmd_count <= num_ops:
         await FallingEdge(dut.clk)
         st = get_int(dut.start)
         dn = get_int(dut.done)
         if st == 0 and dn == 0:
             aa = random.randint(0, 255)
             bb = random.randint(0, 255)
-            op = random.choice(list(Ops))
+            op = op_list.pop(0)
             cvg.add(op)
             dut.A <= aa
             dut.B <= bb
