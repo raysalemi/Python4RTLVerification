@@ -85,13 +85,11 @@ class OpSeq(uvm_sequence):
         self.op = Ops(op)
 
     async def body(self):
-        self.seq_item = AluSeqItem("seq_item",
-                                   self.aa,
-                                   self.bb,
-                                   self.op)
-        await self.start_item(self.seq_item)
-        await self.finish_item(self.seq_item)
-        self.result = self.seq_item.result
+        seq_item = AluSeqItem("seq_item", self.aa, self.bb,
+                              self.op)
+        await self.start_item(seq_item)
+        await self.finish_item(seq_item)
+        self.result = seq_item.result
 
 
 async def do_add(seqr, aa, bb):
@@ -119,13 +117,16 @@ async def do_mul(seqr, aa, bb):
 
 
 class FibonacciSeq(uvm_sequence):
+    def __init__(self, name):
+        super().__init__(name)
+        self.seqr = ConfigDB().get(None, "", "SEQR")
+
     async def body(self):
-        seqr = ConfigDB().get(None, "", "SEQR")
         prev_num = 0
         cur_num = 1
         fib_list = [prev_num, cur_num]
         for _ in range(7):
-            sum = await do_add(seqr, prev_num, cur_num)
+            sum = await do_add(self.seqr, prev_num, cur_num)
             fib_list.append(sum)
             prev_num = cur_num
             cur_num = sum
@@ -248,6 +249,8 @@ class AluEnv(uvm_env):
 class AluTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv("env", self)
+
+    def end_of_elaboration_phase(self):
         self.test_all = TestAllSeq.create("test_all")
 
     async def run_phase(self):
