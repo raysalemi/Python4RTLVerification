@@ -97,8 +97,7 @@ class BaseAluEnv(uvm_env):
     """Instantiate the BFM and scoreboard"""
 
     def build_phase(self):
-        dut = ConfigDB().get(self, "", "DUT")
-        bfm = TinyAluBfm(dut)
+        bfm = TinyAluBfm()
         ConfigDB().set(None, "*", "BFM", bfm)
         self.scoreboard = Scoreboard("scoreboard", self)
 
@@ -134,12 +133,10 @@ class MaxTest(uvm_test):
 @cocotb.test()
 async def random_test(dut):
     """Random operands"""
-    ConfigDB().set(None, "*", "DUT", dut)
     await uvm_root().run_test("RandomTest")
 
 
 @cocotb.test()
 async def max_test(dut):
     """Maximum operands"""
-    ConfigDB().set(None, "*", "DUT", dut)
     await uvm_root().run_test("MaxTest")

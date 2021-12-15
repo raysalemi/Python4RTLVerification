@@ -79,7 +79,8 @@ class Scoreboard():
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa} {Ops(op).name}"
+                    " {bb} = {actual} - predicted {prediction}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
@@ -90,8 +91,8 @@ class Scoreboard():
         return passed
 
 
-async def execute_test(dut, TesterClass):
-    bfm = TinyAluBfm(dut)
+async def execute_test(TesterClass):
+    bfm = TinyAluBfm()
     scoreboard = Scoreboard(bfm)
     await bfm.reset()
     await bfm.start_bfms()
@@ -106,8 +107,7 @@ class RandomTest(uvm_test):
     """Run with random operations"""
     async def run_phase(self):
         self.raise_objection()
-        dut = ConfigDB().get(self, "", "DUT")
-        passed = await execute_test(dut, Tester)
+        passed = await execute_test(Tester)
         assert passed
         self.drop_objection()
 
@@ -116,8 +116,7 @@ class MaxTest(uvm_test):
     """Run with random operations"""
     async def run_phase(self):
         self.raise_objection()
-        dut = ConfigDB().get(self, "", "DUT")
-        passed = await execute_test(dut, MaxTester)
+        passed = await execute_test(MaxTester)
         assert passed
         self.drop_objection()
 
@@ -129,14 +128,12 @@ async def hello_world(_):
 
 
 @cocotb.test()
-async def random_test(dut):
+async def random_test(_):
     """Random operands"""
-    ConfigDB().set(None, "*", "DUT", dut)
     await uvm_root().run_test("RandomTest")
 
 
 @cocotb.test()
-async def max_test(dut):
+async def max_test(_):
     """Maximum operands"""
-    ConfigDB().set(None, "*", "DUT", dut)
     await uvm_root().run_test("MaxTest")
