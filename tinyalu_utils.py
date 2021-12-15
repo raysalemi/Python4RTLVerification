@@ -44,8 +44,8 @@ def get_int(signal):
 
 
 class TinyAluBfm:
-    def __init__(self, dut):
-        self.dut = dut
+    def __init__(self):
+        self.dut = cocotb.top
         self.driver_queue = Queue(maxsize=1)
         self.cmd_mon_queue = Queue(maxsize=0)
         self.result_mon_queue = Queue(maxsize=0)
