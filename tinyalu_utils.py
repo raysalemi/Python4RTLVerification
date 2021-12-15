@@ -64,12 +64,12 @@ class TinyAluBfm:
 
     async def reset(self):
         await FallingEdge(self.dut.clk)
-        self.dut.reset_n <= 0
-        self.dut.A <= 0
-        self.dut.B <= 0
-        self.dut.op <= 0
+        self.dut.reset_n.value = 0
+        self.dut.A.value = 0
+        self.dut.B.value = 0
+        self.dut.op.value = 0
         await FallingEdge(self.dut.clk)
-        self.dut.reset_n <= 1
+        self.dut.reset_n.value = 1
         await FallingEdge(self.dut.clk)
 
     async def driver_bfm(self):

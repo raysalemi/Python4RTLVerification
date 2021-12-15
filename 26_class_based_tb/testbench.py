@@ -85,7 +85,7 @@ class Scoreboard():
 
 @cocotb.test()
 async def test_alu(dut):
-    bfm = TinyAluBfm(dut)
+    bfm = TinyAluBfm()
     tester = Tester(bfm)
     scoreboard = Scoreboard(bfm)
     await bfm.reset()
@@ -96,8 +96,8 @@ async def test_alu(dut):
     assert passed
 
 
-async def execute_test(dut, TesterClass):
-    bfm = TinyAluBfm(dut)
+async def execute_test(TesterClass):
+    bfm = TinyAluBfm()
     scoreboard = Scoreboard(bfm)
     await bfm.reset()
     await bfm.start_bfms()
@@ -111,10 +111,10 @@ async def execute_test(dut, TesterClass):
 @cocotb.test()
 async def random_test(dut):
     """Random operands"""
-    assert await execute_test(dut, Tester)
+    assert await execute_test(Tester)
 
 
 @cocotb.test()
 async def max_test(dut):
     """Maximum operands"""
-    assert await execute_test(dut, MaxTester)
+    assert await execute_test(MaxTester)
