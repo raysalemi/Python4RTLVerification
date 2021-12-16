@@ -47,7 +47,7 @@ class Driver(uvm_driver):
         self.ap = uvm_analysis_port("ap", self)
 
     def start_of_simulation_phase(self):
-        self.bfm = self.cdb_get("BFM")
+        self.bfm = TinyAluBfm()
 
     async def launch_tb(self):
         await self.bfm.reset()
@@ -82,7 +82,8 @@ class Coverage(uvm_subscriber):
     def end_of_elaboration_phase(self):
         self.cvg = set()
         try:
-            self.disable_errors = ConfigDB().get(self, "", "DISABLE_COVERAGE_ERRORS")
+            self.disable_errors = ConfigDB().get(
+                self, "", "DISABLE_COVERAGE_ERRORS")
         except UVMConfigItemNotFound:
             self.disable_errors = False
 
@@ -92,7 +93,8 @@ class Coverage(uvm_subscriber):
 
     def report_phase(self):
         try:
-            disable_errors = ConfigDB().get(self, "", "DISABLE_COVERAGE_ERRORS")
+            disable_errors = ConfigDB().get(
+                self, "", "DISABLE_COVERAGE_ERRORS")
         except UVMConfigItemNotFound:
             disable_errors = False
         if not disable_errors:
@@ -141,8 +143,8 @@ class Scoreboard(uvm_component):
 class Monitor(uvm_component):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
-        self.bfm = self.cdb_get("BFM")
-        self.get_method = getattr(self.bfm, method_name)
+        bfm = TinyAluBfm()
+        self.get_method = getattr(bfm, method_name)
 
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
@@ -235,14 +237,10 @@ class ResponseFibTest(FibonacciTest):
 @cocotb.test()
 async def fibonacci_test(dut):
     """Run Fibonacci sequence"""
-    bfm = TinyAluBfm(dut)
-    ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("FibonacciTest")
 
 
 @cocotb.test()
 async def response_fib_test(dut):
     """Show get_response"""
-    bfm = TinyAluBfm(dut)
-    ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("ResponseFibTest")

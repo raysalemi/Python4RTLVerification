@@ -99,8 +99,8 @@ class Scoreboard(uvm_component):
         self.result_gp = uvm_nonblocking_get_port("result_gp", self)
 
     def connect_phase(self):
-        self.cmd_export.connect(self.cmd_mon_fifo.analysis_export)
-        self.result_export.connect(self.result_mon_fifo.analysis_export)
+        self.cmd_export = self.cmd_mon_fifo.analysis_export
+        self.result_export = self.result_mon_fifo.analysis_export
         self.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
         self.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
 
@@ -116,11 +116,13 @@ class Scoreboard(uvm_component):
             if not result_exists:
                 raise RuntimeError(f"Missing result for command {cmd}")
             if actual == prediction:
-                self.logger.info(f"PASSED: {aa:x} {Ops(op).name} {bb:x} = {actual:x}")
+                self.logger.info(
+                    f"PASSED: {aa:x} {Ops(op).name} {bb:x} = {actual:x}")
             else:
                 passed = False
                 self.logger.error(
-                    f"FAILED: {aa:x} {Ops(op).name} {bb:x} = {actual:x} - predicted {prediction:x}")
+                    f"FAILED: {aa:x} {Ops(op).name} {bb:x} ="
+                    f" {actual:x} - predicted {prediction:x}")
         assert passed
 
 
@@ -128,8 +130,7 @@ class Environment(uvm_env):
     """Instantiate the BFM and scoreboard"""
 
     def build_phase(self):
-        dut = ConfigDB().get(self, "", "DUT")
-        bfm = TinyAluBfm(dut)
+        bfm = TinyAluBfm()
         ConfigDB().set(None, "*", "BFM", bfm)
         self.tester = RandomTester.create("tester", self)
         self.driver = Driver("driver", self)

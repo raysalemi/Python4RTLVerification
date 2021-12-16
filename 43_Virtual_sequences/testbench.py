@@ -139,7 +139,7 @@ class Driver(uvm_driver):
         self.ap = uvm_analysis_port("ap", self)
 
     def start_of_simulation_phase(self):
-        self.bfm = self.cdb_get("BFM")
+        self.bfm = TinyAluBfm()
 
     async def launch_tb(self):
         await self.bfm.reset()
@@ -167,7 +167,8 @@ class Coverage(uvm_subscriber):
 
     def report_phase(self):
         try:
-            disable_errors = ConfigDB().get(self, "", "DISABLE_COVERAGE_ERRORS")
+            disable_errors = ConfigDB().get(
+                self, "", "DISABLE_COVERAGE_ERRORS")
         except UVMConfigItemNotFound:
             disable_errors = False
         if not disable_errors:
@@ -216,7 +217,7 @@ class Scoreboard(uvm_component):
 class Monitor(uvm_component):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
-        self.bfm = self.cdb_get("BFM")
+        self.bfm = TinyAluBfm()
         self.get_method = getattr(self.bfm, method_name)
 
     def build_phase(self):
@@ -259,33 +260,34 @@ class AluTest(uvm_test):
         self.drop_objection()
 
 
-def setup_tb(dut):
-    bfm = TinyAluBfm(dut)
-    ConfigDB().clear()
-    uvm_factory().clear_overrides()
-    ConfigDB().set(None, "*", "BFM", bfm)
-    uvm_root().set_logging_level_hier(INFO)
+class ParallelTest(AluTest):
+    def end_of_elaboration_phase(self):
+        uvm_factory().set_type_override_by_type(TestAllSeq, TestAllForkSeq)
+        return super().end_of_elaboration_phase()
+
+
+class FibonacciTest(AluTest):
+    def end_of_elaboration_phase(self):
+        ConfigDB().set(None, "*", "DISABLE_COVERAGE_ERRORS", True)
+        uvm_factory().set_type_override_by_type(TestAllSeq, FibonacciSeq)
+        return super().end_of_elaboration_phase()
 
 
 @cocotb.test()
 async def alu_test(dut):
     """Test ALU with random and max values"""
-    setup_tb(dut)
+    uvm_root().set_logging_level_hier(INFO)
     await uvm_root().run_test("AluTest")
 
 
 @cocotb.test()
 async def parallel_alu_test(dut):
     """Test ALU random and max forked"""
-    setup_tb(dut)
-    uvm_factory().set_type_override_by_type(TestAllSeq, TestAllForkSeq)
-    await uvm_root().run_test("AluTest")
+    uvm_root().set_logging_level_hier(INFO)
+    await uvm_root().run_test("ParallelTest")
 
 
 @cocotb.test()
 async def fibonacci_sim(dut):
     """Run Fibonacci program"""
-    setup_tb(dut)
-    ConfigDB().set(None, "*", "DISABLE_COVERAGE_ERRORS", True)
-    uvm_factory().set_type_override_by_type(TestAllSeq, FibonacciSeq)
-    await uvm_root().run_test("AluTest")
+    await uvm_root().run_test("FibonacciTest")

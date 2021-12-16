@@ -53,7 +53,7 @@ class MaxSeq(uvm_sequence):
 
 class Driver(uvm_driver):
     def start_of_simulation_phase(self):
-        self.bfm = self.cdb_get("BFM")
+        self.bfm = TinyAluBfm()
 
     async def run_phase(self):
         await self.bfm.reset()
@@ -121,7 +121,7 @@ class Scoreboard(uvm_component):
 class Monitor(uvm_component):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
-        self.bfm = self.cdb_get("BFM")
+        self.bfm = TinyAluBfm()
         self.get_method = getattr(self.bfm, method_name)
 
     def build_phase(self):
@@ -158,7 +158,7 @@ class RandomAluTest(uvm_test):
 
     def end_of_elaboration_phase(self):
         self.seqr = ConfigDB().get(self, "", "SEQR")
-        self.bfm = ConfigDB().get(self, "", "BFM")
+        self.bfm = TinyAluBfm()
 
     async def run_phase(self):
         self.raise_objection()
@@ -176,14 +176,10 @@ class MaxAluTest(RandomAluTest):
 @cocotb.test()
 async def random_alu_test(dut):
     """Use randomized operands"""
-    bfm = TinyAluBfm(dut)
-    ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("RandomAluTest")
 
 
 @cocotb.test()
 async def max_test_alu(dut):
     """Use maximum operands"""
-    bfm = TinyAluBfm(dut)
-    ConfigDB().set(None, "*", "BFM", bfm)
     await uvm_root().run_test("MaxAluTest")

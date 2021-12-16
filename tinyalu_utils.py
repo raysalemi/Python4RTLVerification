@@ -5,6 +5,8 @@ import enum
 import random
 import logging
 
+from pyuvm import utility_classes
+
 logging.basicConfig(level=logging.NOTSET)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -43,7 +45,7 @@ def get_int(signal):
     return sig
 
 
-class TinyAluBfm:
+class TinyAluBfm(metaclass=utility_classes.Singleton):
     def __init__(self):
         self.dut = cocotb.top
         self.driver_queue = Queue(maxsize=1)
