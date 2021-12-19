@@ -9,12 +9,13 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+# ## Blocking communication
+
 async def Producer(queue, nn, delay=None):
     """Produce numbers from 1 to nn and send them"""
     for datum in range(1, nn + 1):
         if delay is not None:
             await Timer(delay, units="ns")
-        logger.info(f"Producer sending {datum}")
         await queue.put(datum)
         logger.info(f"Producer sent {datum}")
 
@@ -22,25 +23,58 @@ async def Producer(queue, nn, delay=None):
 async def Consumer(queue):
     """Get numbers and print them to the log"""
     while True:
-        logger.info("Consumer getting datum")
         datum = await queue.get()
         logger.info(f"Consumer got {datum}")
 
+
+# ### An infinitely long queue
+
+@cocotb.test()
+async def infinte_queue(_):
+    """Show an infinite queue"""
+    queue = Queue()
+    cocotb.start_soon(Consumer(queue))
+    cocotb.start_soon(Producer(queue, 3))
+    await Timer(1, units="ns")
+
+
+# ### A Queue of size 1
+
+@cocotb.test()
+async def queue_max_size_1(_):
+    """Show producer and consumer with maxsize 1"""
+    queue = Queue(maxsize=1)
+    cocotb.start_soon(Consumer(queue))
+    cocotb.start_soon(Producer(queue, 3))
+    await Timer(1, units="ns")
+
+
+# ### Queues and simulation delay
+
+@cocotb.test()
+async def producer_consumer_sim_delay(_):
+    """Show producer and consumer with simulation delay"""
+    queue = Queue(maxsize=1)
+    cocotb.start_soon(Consumer(queue))
+    ptask = cocotb.start_soon(Producer(queue, 3, 5))
+    await ptask
+    await Timer(1, units="ns")
+
+
+# ### Non-blocking communication
 
 async def ProducerNoWait(queue, nn, delay=None):
     """Produce numbers from 1 to nn and send them"""
     for datum in range(1, nn + 1):
         if delay is not None:
             await Timer(delay, units="ns")
-        logger.info(f"Producer sending {datum}")
         sent = False
         while not sent:
             try:
-                logger.info("PUT try")
                 queue.put_nowait(datum)
                 sent = True
             except QueueFull:
-                logger.info("Queue Full")
+                logger.info("Queue Full, waiting 1ns")
                 await Timer(1, units="ns")
         logger.info(f"Producer sent {datum}")
 
@@ -48,50 +82,21 @@ async def ProducerNoWait(queue, nn, delay=None):
 async def ConsumerNoWait(queue):
     """Get numbers and print them to the log"""
     while True:
-        logger.info("Consumer getting datum")
         got = False
         while not got:
             try:
-                logger.info("GET try")
                 datum = queue.get_nowait()
                 got = True
             except QueueEmpty:
-                logger.info("Queue Empty")
+                logger.info("Queue Empty, waiting 2 ns")
                 await Timer(2, units="ns")
         logger.info(f"Consumer got {datum}")
-
-
-@cocotb.test()
-async def producer_consumer_no_delay(_):
-    """Show producer and consumer with no delay"""
-    queue = Queue()
-    cocotb.fork(Consumer(queue))
-    await Producer(queue, 2)
-    await Timer(1, units="ns")
-
-
-@cocotb.test()
-async def producer_consumer_max_size_1(_):
-    """Show producer and consumer with maxsize 1"""
-    queue = Queue(maxsize=1)
-    cocotb.fork(Consumer(queue))
-    await Producer(queue, 2)
-    await Timer(1, units="ns")
-
-
-@cocotb.test()
-async def producer_consumer_sim_delay(_):
-    """Show producer and consumer with simulation delay"""
-    queue = Queue(maxsize=1)
-    cocotb.fork(Consumer(queue))
-    await Producer(queue, 2, 5)
-    await Timer(1, units="ns")
 
 
 @cocotb.test()
 async def producer_consumer_nowait(_):
     """Show producer and consumer not waiting"""
     queue = Queue(maxsize=1)
-    cocotb.fork(ConsumerNoWait(queue))
-    await ProducerNoWait(queue, 2)
-    await Timer(5, units="ns")
+    cocotb.start_soon(ConsumerNoWait(queue))
+    await ProducerNoWait(queue, 3)
+    await Timer(3, units="ns")
