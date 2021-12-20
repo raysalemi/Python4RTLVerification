@@ -14,7 +14,7 @@ async def test_alu(_):
     passed = True
     bfm = TinyAluBfm()
     await bfm.reset()
-    await bfm.start_bfms()
+    bfm.start_bfms()
     cvg = set()
     ops = list(Ops)
     for op in ops:

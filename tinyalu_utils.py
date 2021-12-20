@@ -2,16 +2,12 @@ import cocotb
 from cocotb.triggers import FallingEdge
 from cocotb.queue import QueueEmpty, Queue
 import enum
-import random
 import logging
 
 from pyuvm import utility_classes
 
-logging.basicConfig(level=logging.NOTSET)
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
 
-
+# #### The OPS enumeration
 @enum.unique
 class Ops(enum.IntEnum):
     """Legal ops for the TinyALU"""
@@ -21,7 +17,8 @@ class Ops(enum.IntEnum):
     MUL = 4
 
 
-def alu_prediction(A, B, op, error=False):
+# #### The alu_prediction function
+def alu_prediction(A, B, op):
     """Python model of the TinyALU"""
     assert isinstance(op, Ops), "The tinyalu op must be of type Ops"
     if op == Ops.ADD:
@@ -32,10 +29,17 @@ def alu_prediction(A, B, op, error=False):
         result = A ^ B
     elif op == Ops.MUL:
         result = A * B
-    if error and (random.randint(0, 3) == 0):
-        result = result + 1
     return result
 
+
+# #### The logger
+
+logging.basicConfig(level=logging.NOTSET)
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+
+# ### Reading a signal value
 
 def get_int(signal):
     try:
@@ -45,24 +49,17 @@ def get_int(signal):
     return sig
 
 
+# ## The TinyAluBfm singleton
+# ### Initializing the TinyAluBfm object
+
 class TinyAluBfm(metaclass=utility_classes.Singleton):
     def __init__(self):
         self.dut = cocotb.top
-        self.driver_queue = Queue(maxsize=1)
+        self.cmd_driver_queue = Queue(maxsize=1)
         self.cmd_mon_queue = Queue(maxsize=0)
         self.result_mon_queue = Queue(maxsize=0)
 
-    async def send_op(self, aa, bb, op):
-        command_tuple = (aa, bb, op)
-        await self.driver_queue.put(command_tuple)
-
-    async def get_cmd(self):
-        cmd = await self.cmd_mon_queue.get()
-        return cmd
-
-    async def get_result(self):
-        result = await self.result_mon_queue.get()
-        return result
+# ### The reset coroutine
 
     async def reset(self):
         await FallingEdge(self.dut.clk)
@@ -74,29 +71,21 @@ class TinyAluBfm(metaclass=utility_classes.Singleton):
         self.dut.reset_n.value = 1
         await FallingEdge(self.dut.clk)
 
-    async def driver_bfm(self):
-        self.dut.start.value = 0
-        self.dut.A.value = 0
-        self.dut.B.value = 0
-        self.dut.op.value = 0
+# ## The communication coroutines
+# #### result_mon()
+
+    async def result_mon(self):
+        prev_done = 0
         while True:
             await FallingEdge(self.dut.clk)
-            start = get_int(self.dut.start)
             done = get_int(self.dut.done)
-            if start == 0 and done == 0:
-                try:
-                    (aa, bb, op) = self.driver_queue.get_nowait()
-                    self.dut.A.value = aa
-                    self.dut.B.value = bb
-                    self.dut.op.value = op
-                    self.dut.start.value = 1
-                except QueueEmpty:
-                    pass
-            elif start == 1:
-                if done == 1:
-                    self.dut.start.value = 0
+            if prev_done == 0 and done == 1:
+                result = get_int(self.dut.result)
+                self.result_mon_queue.put_nowait(result)
+            prev_done = done
 
-    async def cmd_mon_bfm(self):
+# #### cmd_mon()
+    async def cmd_mon(self):
         prev_start = 0
         while True:
             await FallingEdge(self.dut.clk)
@@ -108,17 +97,45 @@ class TinyAluBfm(metaclass=utility_classes.Singleton):
                 self.cmd_mon_queue.put_nowait(cmd_tuple)
             prev_start = start
 
-    async def result_mon_bfm(self):
-        prev_done = 0
+# #### driver()
+
+    async def cmd_driver(self):
+        self.dut.start.value = 0
+        self.dut.A.value = 0
+        self.dut.B.value = 0
+        self.dut.op.value = 0
         while True:
             await FallingEdge(self.dut.clk)
-            done = get_int(self.dut.done)
-            if prev_done == 0 and done == 1:
-                result = get_int(self.dut.result)
-                self.result_mon_queue.put_nowait(result)
-            prev_done = done
+            st = get_int(self.dut.start)
+            dn = get_int(self.dut.done)
+            if st == 0 and dn == 0:
+                try:
+                    (aa, bb, op) = self.cmd_driver_queue.get_nowait()
+                    self.dut.A.value = aa
+                    self.dut.B.value = bb
+                    self.dut.op.value = op
+                    self.dut.start.value = 1
+                except QueueEmpty:
+                    continue
+            elif st == 1:
+                if dn == 1:
+                    self.dut.start.value = 0
 
-    async def start_bfms(self):
-        cocotb.fork(self.driver_bfm())
-        cocotb.fork(self.cmd_mon_bfm())
-        cocotb.fork(self.result_mon_bfm())
+# ### Launching the coroutines using start_soon
+
+    def start_bfms(self):
+        cocotb.start_soon(self.cmd_driver())
+        cocotb.start_soon(self.cmd_mon())
+        cocotb.start_soon(self.result_mon())
+
+    async def get_cmd(self):
+        cmd = await self.cmd_mon_queue.get()
+        return cmd
+
+    async def get_result(self):
+        result = await self.result_mon_queue.get()
+        return result
+
+    async def send_op(self, aa, bb, op):
+        command_tuple = (aa, bb, op)
+        await self.cmd_driver_queue.put(command_tuple)

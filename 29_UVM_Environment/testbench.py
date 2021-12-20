@@ -17,7 +17,7 @@ class Tester(uvm_component):
     async def run_phase(self):
         self.raise_objection()
         await self.bfm.reset()
-        await self.bfm.start_bfms()
+        self.bfm.start_bfms()
         ops = list(Ops)
         for op in ops:
             aa = random.randint(0, 255)
@@ -35,7 +35,7 @@ class MaxTester(Tester):
     async def run_phase(self):
         self.raise_objection()
         await self.bfm.reset()
-        await self.bfm.start_bfms()
+        self.bfm.start_bfms()
         ops = list(Ops)
         for op in ops:
             aa = 0xFF

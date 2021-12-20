@@ -2,16 +2,11 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, FallingEdge
 from pathlib import Path
-import logging
 import sys
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 sys.path.append(str(Path("..").resolve()))
-from tinyalu_utils import get_int  # noqa: E402
-
-logging.basicConfig(level=logging.NOTSET)
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from tinyalu_utils import get_int, logger  # noqa: E402
 
 
 # ## Testing reset_n

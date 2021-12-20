@@ -95,7 +95,7 @@ async def execute_test(TesterClass):
     bfm = TinyAluBfm()
     scoreboard = Scoreboard(bfm)
     await bfm.reset()
-    await bfm.start_bfms()
+    bfm.start_bfms()
     cocotb.fork(scoreboard.execute())
     tester = TesterClass(bfm)
     await tester.execute()

@@ -48,7 +48,7 @@ class Driver(uvm_driver):
 
     async def run_phase(self):
         await self.bfm.reset()
-        await self.bfm.start_bfms()
+        self.bfm.start_bfms()
         while True:
             aa, bb, op = await self.bgp.get()
             await self.bfm.send_op(aa, bb, op)

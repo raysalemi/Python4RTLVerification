@@ -1,52 +1,71 @@
+# ## Importing modules
+
 import cocotb
 from cocotb.triggers import FallingEdge
 import random
+
+# ### The tinyalu_utils module
+
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
-import sys
+
 from pathlib import Path
-sys.path.append(str(Path("..").resolve()))
+parent_path = Path("..").resolve()
+
+import sys  # noqa: E402
+sys.path.append(str(parent_path))
+
 from tinyalu_utils import Ops, alu_prediction, logger, get_int  # noqa: E402
 
 
-@cocotb.test(expect_error=AssertionError)
+# ## Setting up the cocotb TinyALU test
+
+@cocotb.test()
 async def alu_test(dut):
     passed = True
     cvg = set()  # functional coverage
     await FallingEdge(dut.clk)
-    dut.reset_n <= 0
-    dut.start <= 0
+    dut.reset_n.value = 0
+    dut.start.value = 0
     await FallingEdge(dut.clk)
-    dut.reset_n <= 1
+    dut.reset_n.value = 1
+# ### Sending commands
     cmd_count = 1
     op_list = list(Ops)
-    op_list.pop(0)
     num_ops = len(op_list)
     while cmd_count <= num_ops:
         await FallingEdge(dut.clk)
         st = get_int(dut.start)
         dn = get_int(dut.done)
+# ### Sending a command and waiting for it to complete
         if st == 0 and dn == 0:
             aa = random.randint(0, 255)
             bb = random.randint(0, 255)
             op = op_list.pop(0)
             cvg.add(op)
-            dut.A <= aa
-            dut.B <= bb
-            dut.op <= op
-            dut.start <= 1
-        if st == 1 and dn == 0 or st == 0 and dn == 1:
+            dut.A.value = aa
+            dut.B.value = bb
+            dut.op.value = op
+            dut.start.value = 1
+        if st == 0 and dn == 1:
+            raise AssertionError("DUT Error: done set to 1 without start")
+        if st == 1 and dn == 0:
             continue
+# ### Checking the result
         if st == 1 and dn == 1:
-            dut.start <= 0
+            dut.start.value = 0
             cmd_count += 1
             result = get_int(dut.result)
             pr = alu_prediction(aa, bb, op)
             if result == pr:
-                logger.info(f"PASSED: {aa} {op.name} {bb} = {result}")
+                logger.info(
+                    f"PASSED: {aa:2x} {op.name} {bb:2x} = {result:04x}")
             else:
-                logger.error(f"FAILED: {aa} {op.name} {bb} = {result} - predicted {pr}")
+                logger.error(
+                    f"FAILED: {aa:2x} {op.name} {bb:2x} ="
+                    f" {result:04x} - predicted {pr:04x}")
                 passed = False
+# ### Finishing the test
     if len(set(Ops) - cvg) > 0:
         logger.error(f"Functional coverage error. Missed: {set(Ops)-cvg}")
         passed = False
