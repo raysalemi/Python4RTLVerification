@@ -72,7 +72,8 @@ class Scoreboard():
             actual = self.results.pop(0)
             prediction = alu_prediction(aa, bb, op)
             if actual == prediction:
-                logger.info(f"PASSED: {aa:02x} {op.name} {bb:02x} = {actual:04x}")
+                logger.info(
+                    f"PASSED: {aa:02x} {op.name} {bb:02x} = {actual:04x}")
             else:
                 passed = False
                 logger.error(
@@ -87,6 +88,7 @@ class Scoreboard():
             logger.info("Covered all operations")
         return passed
 
+
 # ## The execute_test() coroutine
 
 async def execute_test(TesterClass):
@@ -100,6 +102,7 @@ async def execute_test(TesterClass):
     passed = scoreboard.check_results()
     return passed
 
+
 # ## The cocotb tests
 
 @cocotb.test()
@@ -107,6 +110,7 @@ async def random_test(_):
     """Random operands"""
     passed = await execute_test(RandomTester)
     assert passed
+
 
 @cocotb.test()
 async def max_test(_):
