@@ -57,7 +57,7 @@ class Driver(uvm_driver):
 
     async def run_phase(self):
         await self.bfm.reset()
-        self.bfm.start_bfms()
+        self.bfm.start_tasks()
         while True:
             cmd = await self.seq_item_port.get_next_item()
             self.logger.debug(f"GOT command: {cmd}")

@@ -123,7 +123,7 @@ class TinyAluBfm(metaclass=utility_classes.Singleton):
 
 # ### Launching the coroutines using start_soon
 
-    def start_bfms(self):
+    def start_tasks(self):
         cocotb.start_soon(self.cmd_driver())
         cocotb.start_soon(self.cmd_mon())
         cocotb.start_soon(self.result_mon())

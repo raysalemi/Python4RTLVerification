@@ -72,7 +72,8 @@ class Scoreboard():
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {op.name} {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa} {op.name} {bb} = {actual}"
+                    f" - predicted {prediction}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
@@ -89,7 +90,7 @@ async def test_alu(dut):
     tester = Tester(bfm)
     scoreboard = Scoreboard(bfm)
     await bfm.reset()
-    bfm.start_bfms()
+    bfm.start_tasks()
     cocotb.fork(scoreboard.execute())
     await tester.execute()
     passed = scoreboard.check_results()
@@ -100,7 +101,7 @@ async def execute_test(TesterClass):
     bfm = TinyAluBfm()
     scoreboard = Scoreboard(bfm)
     await bfm.reset()
-    bfm.start_bfms()
+    bfm.start_tasks()
     cocotb.fork(scoreboard.execute())
     tester = TesterClass(bfm)
     await tester.execute()
