@@ -8,15 +8,14 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
-class Tester():
-    def __init__(self, bfm):
-        self.bfm = bfm
+# ## The BaseTester class
+class BaseTester():
 
     async def execute(self):
+        self.bfm = TinyAluBfm()
         ops = list(Ops)
         for op in ops:
-            aa = random.randint(0, 255)
-            bb = random.randint(0, 255)
+            aa, bb = self.get_operands()
             await self.bfm.send_op(aa, bb, op)
         # send two dummy operations to allow
         # last real operation to complete
@@ -24,27 +23,29 @@ class Tester():
         await self.bfm.send_op(0, 0, 1)
 
 
-class MaxTester(Tester):
-
-    async def execute(self):
-        ops = list(Ops)
-        for op in ops:
-            aa = 0xFF
-            bb = 0xFF
-            await self.bfm.send_op(aa, bb, op)
-        # send two dummy operations to allow
-        # last real operation to complete
-        await self.bfm.send_op(0, 0, 1)
-        await self.bfm.send_op(0, 0, 1)
+# ### The RandomTester
+class RandomTester(BaseTester):
+    def get_operands(self):
+        return random.randint(0, 255), random.randint(0, 255)
 
 
+# ### The MaxTester
+class MaxTester(BaseTester):
+
+    def get_operands(self):
+        return 0xFF, 0xFF
+
+
+# ## The Scoreboard class
+# ### Initialize the scoreboard
 class Scoreboard():
-    def __init__(self, bfm):
-        self.bfm = bfm
+    def __init__(self):
+        self.bfm = TinyAluBfm()
         self.cmds = []
         self.results = []
         self.cvg = set()
 
+# ### Define the data gathering tasks
     async def get_cmds(self):
         while True:
             cmd = await self.bfm.get_cmd()
@@ -55,10 +56,13 @@ class Scoreboard():
             result = await self.bfm.get_result()
             self.results.append(result)
 
-    async def execute(self):
-        cocotb.fork(self.get_cmds())
-        cocotb.fork(self.get_results())
+# ### The Scoreboard's start_tasks() function
 
+    def start_tasks(self):
+        cocotb.start_soon(self.get_cmds())
+        cocotb.start_soon(self.get_results())
+
+# ### The Scoreboard's check_results() function
     def check_results(self):
         passed = True
         for cmd in self.cmds:
@@ -68,12 +72,12 @@ class Scoreboard():
             actual = self.results.pop(0)
             prediction = alu_prediction(aa, bb, op)
             if actual == prediction:
-                logger.info(f"PASSED: {aa} {op.name} {bb} = {actual}")
+                logger.info(f"PASSED: {aa:02x} {op.name} {bb:02x} = {actual:04x}")
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {op.name} {bb} = {actual}"
-                    f" - predicted {prediction}")
+                    f"FAILED: {aa:02x} {op.name} {bb:02x} = {actual:04x}"
+                    f" - predicted {prediction:04x}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
@@ -83,39 +87,29 @@ class Scoreboard():
             logger.info("Covered all operations")
         return passed
 
-
-@cocotb.test()
-async def test_alu(dut):
-    bfm = TinyAluBfm()
-    tester = Tester(bfm)
-    scoreboard = Scoreboard(bfm)
-    await bfm.reset()
-    bfm.start_tasks()
-    cocotb.fork(scoreboard.execute())
-    await tester.execute()
-    passed = scoreboard.check_results()
-    assert passed
-
+# ## The execute_test() coroutine
 
 async def execute_test(TesterClass):
     bfm = TinyAluBfm()
-    scoreboard = Scoreboard(bfm)
+    scoreboard = Scoreboard()
     await bfm.reset()
     bfm.start_tasks()
-    cocotb.fork(scoreboard.execute())
-    tester = TesterClass(bfm)
+    scoreboard.start_tasks()
+    tester = TesterClass()
     await tester.execute()
     passed = scoreboard.check_results()
     return passed
 
+# ## The cocotb tests
 
 @cocotb.test()
-async def random_test(dut):
+async def random_test(_):
     """Random operands"""
-    assert await execute_test(Tester)
-
+    passed = await execute_test(RandomTester)
+    assert passed
 
 @cocotb.test()
-async def max_test(dut):
+async def max_test(_):
     """Maximum operands"""
-    assert await execute_test(MaxTester)
+    passed = await execute_test(MaxTester)
+    assert passed
