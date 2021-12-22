@@ -124,16 +124,16 @@ class MaxTest(uvm_test):
 @cocotb.test()
 async def hello_world(_):
     """Say hello"""
-    await uvm_root().run_test("HelloWorldTest")
+    await uvm_root().run_test(HelloWorldTest)
 
 
 @cocotb.test()
 async def random_test(_):
     """Random operands"""
-    await uvm_root().run_test("RandomTest")
+    await uvm_root().run_test(RandomTest)
 
 
 @cocotb.test()
 async def max_test(_):
     """Maximum operands"""
-    await uvm_root().run_test("MaxTest")
+    await uvm_root().run_test(MaxTest)

@@ -38,7 +38,7 @@ class PhaseTest(uvm_test):
 @cocotb.test()
 async def phase_test(dut):
     """print out the phases"""
-    await uvm_root().run_test("PhaseTest")
+    await uvm_root().run_test(PhaseTest)
     assert True
 
 
@@ -69,4 +69,4 @@ class TopTest(uvm_test):
 @cocotb.test()
 async def hierarchy_test(dut):
     """Create hierarchy"""
-    await uvm_root().run_test("TopTest")
+    await uvm_root().run_test(TopTest)
