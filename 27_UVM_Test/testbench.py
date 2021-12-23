@@ -9,6 +9,8 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
+# ## The HelloWorldTest class
+
 class HelloWorldTest(uvm_test):
     async def run_phase(self):
         self.raise_objection()
@@ -16,15 +18,21 @@ class HelloWorldTest(uvm_test):
         self.drop_objection()
 
 
-class Tester():
-    def __init__(self, bfm):
-        self.bfm = bfm
+# ### Running the `HelloWorldTest`
+
+@cocotb.test()
+async def hello_world(_):
+    await uvm_root().run_test(HelloWorldTest)
+
+
+# ## Testing the TinyALU
+class BaseTester():
 
     async def execute(self):
+        self.bfm = TinyAluBfm()
         ops = list(Ops)
         for op in ops:
-            aa = random.randint(0, 255)
-            bb = random.randint(0, 255)
+            aa, bb = self.get_operands()
             await self.bfm.send_op(aa, bb, op)
         # send two dummy operations to allow
         # last real operation to complete
@@ -32,27 +40,27 @@ class Tester():
         await self.bfm.send_op(0, 0, 1)
 
 
-class MaxTester(Tester):
+# ### The RandomTester
+class RandomTester(BaseTester):
+    def get_operands(self):
+        return random.randint(0, 255), random.randint(0, 255)
 
-    async def execute(self):
-        ops = list(Ops)
-        for op in ops:
-            aa = 0xFF
-            bb = 0xFF
-            await self.bfm.send_op(aa, bb, op)
-        # send two dummy operations to allow
-        # last real operation to complete
-        await self.bfm.send_op(0, 0, 1)
-        await self.bfm.send_op(0, 0, 1)
+
+# ### The MaxTester
+class MaxTester(BaseTester):
+
+    def get_operands(self):
+        return 0xFF, 0xFF
 
 
 class Scoreboard():
-    def __init__(self, bfm):
-        self.bfm = bfm
+    def __init__(self):
+        self.bfm = TinyAluBfm()
         self.cmds = []
         self.results = []
         self.cvg = set()
 
+# ### Define the data gathering tasks
     async def get_cmds(self):
         while True:
             cmd = await self.bfm.get_cmd()
@@ -63,24 +71,29 @@ class Scoreboard():
             result = await self.bfm.get_result()
             self.results.append(result)
 
-    async def execute(self):
-        cocotb.fork(self.get_cmds())
-        cocotb.fork(self.get_results())
+# ### The Scoreboard's start_tasks() function
 
+    def start_tasks(self):
+        cocotb.start_soon(self.get_cmds())
+        cocotb.start_soon(self.get_results())
+
+# ### The Scoreboard's check_results() function
     def check_results(self):
         passed = True
         for cmd in self.cmds:
-            (aa, bb, op) = cmd
-            self.cvg.add(Ops(op))
+            aa, bb, op_int = cmd
+            op = Ops(op_int)
+            self.cvg.add(op)
             actual = self.results.pop(0)
-            prediction = alu_prediction(aa, bb, Ops(op))
+            prediction = alu_prediction(aa, bb, op)
             if actual == prediction:
-                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
+                logger.info(
+                    f"PASSED: {aa:02x} {op.name} {bb:02x} = {actual:04x}")
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {Ops(op).name}"
-                    " {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa:02x} {op.name} {bb:02x} = {actual:04x}"
+                    f" - predicted {prediction:04x}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
@@ -91,40 +104,31 @@ class Scoreboard():
         return passed
 
 
-async def execute_test(TesterClass):
-    bfm = TinyAluBfm()
-    scoreboard = Scoreboard(bfm)
-    await bfm.reset()
-    bfm.start_tasks()
-    cocotb.fork(scoreboard.execute())
-    tester = TesterClass(bfm)
-    await tester.execute()
-    passed = scoreboard.check_results()
-    return passed
+class BaseTest(uvm_test):
 
-
-class RandomTest(uvm_test):
-    """Run with random operations"""
     async def run_phase(self):
         self.raise_objection()
-        passed = await execute_test(Tester)
+        bfm = TinyAluBfm()
+        scoreboard = Scoreboard()
+        await bfm.reset()
+        bfm.start_tasks()
+        scoreboard.start_tasks()
+        await self.tester.execute()
+        passed = scoreboard.check_results()
         assert passed
         self.drop_objection()
 
 
-class MaxTest(uvm_test):
+class RandomTest(BaseTest):
     """Run with random operations"""
-    async def run_phase(self):
-        self.raise_objection()
-        passed = await execute_test(MaxTester)
-        assert passed
-        self.drop_objection()
+    def build_phase(self):
+        self.tester = RandomTester()
 
 
-@cocotb.test()
-async def hello_world(_):
-    """Say hello"""
-    await uvm_root().run_test(HelloWorldTest)
+class MaxTest(BaseTest):
+    """Run with random operations"""
+    def build_phase(self):
+        self.tester = MaxTester()
 
 
 @cocotb.test()
