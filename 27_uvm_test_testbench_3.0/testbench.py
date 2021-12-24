@@ -9,23 +9,7 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
-# ## The HelloWorldTest class
-
-class HelloWorldTest(uvm_test):
-    async def run_phase(self):
-        self.raise_objection()
-        self.logger.info("Hello, world.")
-        self.drop_objection()
-
-
-# ### Running the `HelloWorldTest`
-
-@cocotb.test()
-async def hello_world(_):
-    await uvm_root().run_test(HelloWorldTest)
-
-
-# ## Testing the TinyALU
+# Copied from testbench 2.0
 class BaseTester():
 
     async def execute(self):
@@ -40,13 +24,11 @@ class BaseTester():
         await self.bfm.send_op(0, 0, 1)
 
 
-# ### The RandomTester
 class RandomTester(BaseTester):
     def get_operands(self):
         return random.randint(0, 255), random.randint(0, 255)
 
 
-# ### The MaxTester
 class MaxTester(BaseTester):
 
     def get_operands(self):
@@ -60,7 +42,6 @@ class Scoreboard():
         self.results = []
         self.cvg = set()
 
-# ### Define the data gathering tasks
     async def get_cmds(self):
         while True:
             cmd = await self.bfm.get_cmd()
@@ -71,13 +52,10 @@ class Scoreboard():
             result = await self.bfm.get_result()
             self.results.append(result)
 
-# ### The Scoreboard's start_tasks() function
-
     def start_tasks(self):
         cocotb.start_soon(self.get_cmds())
         cocotb.start_soon(self.get_results())
 
-# ### The Scoreboard's check_results() function
     def check_results(self):
         passed = True
         for cmd in self.cmds:
@@ -102,6 +80,23 @@ class Scoreboard():
         else:
             logger.info("Covered all operations")
         return passed
+
+
+# # uvm_test testbench 3.0
+# ## The HelloWorldTest class
+
+class HelloWorldTest(uvm_test):
+    async def run_phase(self):
+        self.raise_objection()
+        self.logger.info("Hello, world.")
+        self.drop_objection()
+
+
+# ### Running the `HelloWorldTest`
+
+@cocotb.test()
+async def hello_world(_):
+    await uvm_root().run_test(HelloWorldTest)
 
 
 class BaseTest(uvm_test):
