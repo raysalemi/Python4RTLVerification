@@ -9,19 +9,17 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
-class Tester(uvm_component):
+class BaseTester(uvm_component):
 
-    def build_phase(self):
-        self.bfm = ConfigDB().get(self, "", "BFM")
+    def start_of_simulation_phase(self):
+        TinyAluBfm().start_tasks()
 
     async def run_phase(self):
         self.raise_objection()
-        await self.bfm.reset()
-        self.bfm.start_tasks()
+        self.bfm = TinyAluBfm()
         ops = list(Ops)
         for op in ops:
-            aa = random.randint(0, 255)
-            bb = random.randint(0, 255)
+            aa, bb = self.get_operands()
             await self.bfm.send_op(aa, bb, op)
         # send two dummy operations to allow
         # last real operation to complete
@@ -30,31 +28,17 @@ class Tester(uvm_component):
         self.drop_objection()
 
 
-class MaxTester(Tester):
+class RandomTester(BaseTester):
+    def get_operands(self):
+        return random.randint(0, 255), random.randint(0, 255)
 
-    async def run_phase(self):
-        self.raise_objection()
-        await self.bfm.reset()
-        self.bfm.start_tasks()
-        ops = list(Ops)
-        for op in ops:
-            aa = 0xFF
-            bb = 0xFF
-            await self.bfm.send_op(aa, bb, op)
-        # send two dummy operations to allow
-        # last real operation to complete
-        await self.bfm.send_op(0, 0, 1)
-        await self.bfm.send_op(0, 0, 1)
-        self.drop_objection()
+
+class MaxTester(BaseTester):
+    def get_operands(self):
+        return 0xFF, 0xFF
 
 
 class Scoreboard(uvm_component):
-
-    def build_phase(self):
-        self.bfm = ConfigDB().get(self, "", "BFM")
-        self.cmds = []
-        self.results = []
-        self.cvg = set()
 
     async def get_cmds(self):
         while True:
@@ -66,23 +50,30 @@ class Scoreboard(uvm_component):
             result = await self.bfm.get_result()
             self.results.append(result)
 
-    async def run_phase(self):
-        cocotb.fork(self.get_cmds())
-        cocotb.fork(self.get_results())
+    def start_of_simulation_phase(self):
+        self.bfm = TinyAluBfm()
+        self.cmds = []
+        self.results = []
+        self.cvg = set()
+        cocotb.start_soon(self.get_cmds())
+        cocotb.start_soon(self.get_results())
 
     def check_phase(self):
         passed = True
         for cmd in self.cmds:
-            (aa, bb, op) = cmd
-            self.cvg.add(Ops(op))
+            aa, bb, op_int = cmd
+            op = Ops(op_int)
+            self.cvg.add(op)
             actual = self.results.pop(0)
-            prediction = alu_prediction(aa, bb, Ops(op))
+            prediction = alu_prediction(aa, bb, op)
             if actual == prediction:
-                logger.info(f"PASSED: {aa} {Ops(op).name} {bb} = {actual}")
+                logger.info(
+                    f"PASSED: {aa:02x} {op.name} {bb:02x} = {actual:04x}")
             else:
                 passed = False
                 logger.error(
-                    f"FAILED: {aa} {Ops(op).name} {bb} = {actual} - predicted {prediction}")
+                    f"FAILED: {aa:02x} {op.name} {bb:02x} = {actual:04x}"
+                    f" - predicted {prediction:04x}")
 
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
@@ -97,8 +88,6 @@ class BaseAluEnv(uvm_env):
     """Instantiate the BFM and scoreboard"""
 
     def build_phase(self):
-        bfm = TinyAluBfm()
-        ConfigDB().set(None, "*", "BFM", bfm)
         self.scoreboard = Scoreboard("scoreboard", self)
 
 
@@ -107,7 +96,7 @@ class RandomAluEnv(BaseAluEnv):
 
     def build_phase(self):
         super().build_phase()
-        self.tester = Tester("tester", self)
+        self.tester = RandomTester("tester", self)
 
 
 class MaxAluEnv(BaseAluEnv):
@@ -133,10 +122,10 @@ class MaxTest(uvm_test):
 @cocotb.test()
 async def random_test(dut):
     """Random operands"""
-    await uvm_root().run_test("RandomTest")
+    await uvm_root().run_test(RandomTest)
 
 
 @cocotb.test()
 async def max_test(dut):
     """Maximum operands"""
-    await uvm_root().run_test("MaxTest")
+    await uvm_root().run_test(MaxTest)
