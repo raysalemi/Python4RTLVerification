@@ -1,38 +1,38 @@
 import cocotb
-from cocotb.triggers import Timer
 from pyuvm import *
 
 
+# # uvm_component
+# ## Running the phases
 class PhaseTest(uvm_test):
     def build_phase(self):
-        self.logger.info("build_phase: Adds components")
+        print("1 build_phase")
 
     def connect_phase(self):
-        self.logger.info("connect_phase: Connects components")
+        print("2 connect_phase")
 
     def end_of_elaboration_phase(self):
-        self.logger.info("end_of_elaboration_phase: Testbench is built")
+        print("3 end_of_elaboration_phase")
 
     def start_of_simulation_phase(self):
-        self.logger.info("start_of_simulation_phase: Ready to sim")
+        print("4 start_of_simulation_phase")
 
     async def run_phase(self):
         self.raise_objection()
-        await Timer(2, units="ns")
-        self.logger.info("run_phase: Simulate and consume time")
+        print("5 run_phase")
         self.drop_objection()
 
     def extract_phase(self):
-        self.logger.info("extract_phase: Simulation is over. Gather data")
+        print("6 extract_phase")
 
     def check_phase(self):
-        self.logger.info("check_phase: Check the results")
+        print("7 check_phase")
 
     def report_phase(self):
-        self.logger.info("report_phase: Report the results")
+        print("8 report_phase")
 
     def final_phase(self):
-        self.logger.info("final_phase: Final clean up")
+        print("9 final_phase")
 
 
 @cocotb.test()
@@ -42,14 +42,17 @@ async def phase_test(dut):
     assert True
 
 
-class BottomComp(uvm_component):
-    async def run_phase(self):
-        self.raise_objection()
-        await Timer(1, units="ns")
-        self.logger.info(f"{self.get_name()} run phase")
-        self.drop_objection()
+# ## Building the testbench hierarchy
+# ### TestTop (uvm_test_top)
+class TestTop(uvm_test):
+    def build_phase(self):
+        self.mc = MiddleComp("mc", self)
+
+    def final_phase(self):
+        self.logger.info(f"{self.get_name()} final phase")
 
 
+# ### MiddleComp (uvm_test_top.mc)
 class MiddleComp(uvm_component):
     def build_phase(self):
         self.bc = BottomComp(name="bc", parent=self)
@@ -58,15 +61,15 @@ class MiddleComp(uvm_component):
         self.logger.info(f"{self.get_name()} end of elaboration phase")
 
 
-class TopTest(uvm_test):
-    def build_phase(self):
-        self.mc = MiddleComp("mc", self)
-
-    def final_phase(self):
-        self.logger.info(f"{self.get_name()} final phase")
+# ### BottomComp (uvm_test_top.mc.bc)
+class BottomComp(uvm_component):
+    async def run_phase(self):
+        self.raise_objection()
+        self.logger.info(f"{self.get_name()} run phase")
+        self.drop_objection()
 
 
 @cocotb.test()
 async def hierarchy_test(dut):
     """Create hierarchy"""
-    await uvm_root().run_test(TopTest)
+    await uvm_root().run_test(TestTop)
