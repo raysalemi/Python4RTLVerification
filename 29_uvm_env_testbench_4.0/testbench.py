@@ -6,9 +6,11 @@ import sys
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 sys.path.append(str(Path("..").resolve()))
-from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
+from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
+# ## Converting the testers to UVM components
+# ### BaseTester
 class BaseTester(uvm_component):
 
     def start_of_simulation_phase(self):
@@ -28,6 +30,7 @@ class BaseTester(uvm_component):
         self.drop_objection()
 
 
+# ### RandomTester and MaxTester
 class RandomTester(BaseTester):
     def get_operands(self):
         return random.randint(0, 255), random.randint(0, 255)
@@ -38,6 +41,7 @@ class MaxTester(BaseTester):
         return 0xFF, 0xFF
 
 
+# ### Scoreboard
 class Scoreboard(uvm_component):
 
     async def get_cmds(self):
@@ -67,31 +71,32 @@ class Scoreboard(uvm_component):
             actual = self.results.pop(0)
             prediction = alu_prediction(aa, bb, op)
             if actual == prediction:
-                logger.info(
+                self.logger.info(
                     f"PASSED: {aa:02x} {op.name} {bb:02x} = {actual:04x}")
             else:
                 passed = False
-                logger.error(
+                self.logger.error(
                     f"FAILED: {aa:02x} {op.name} {bb:02x} = {actual:04x}"
                     f" - predicted {prediction:04x}")
 
         if len(set(Ops) - self.cvg) > 0:
-            logger.error(
+            self.logger.error(
                 f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
             passed = False
         else:
-            logger.info("Covered all operations")
+            self.logger.info("Covered all operations")
         assert passed
 
 
-class BaseAluEnv(uvm_env):
-    """Instantiate the BFM and scoreboard"""
+# ## Using an environment
+class BaseEnv(uvm_env):
+    """Instantiate the scoreboard"""
 
     def build_phase(self):
         self.scoreboard = Scoreboard("scoreboard", self)
 
 
-class RandomAluEnv(BaseAluEnv):
+class RandomEnv(BaseEnv):
     """Generate random operands"""
 
     def build_phase(self):
@@ -99,7 +104,7 @@ class RandomAluEnv(BaseAluEnv):
         self.tester = RandomTester("tester", self)
 
 
-class MaxAluEnv(BaseAluEnv):
+class MaxEnv(BaseEnv):
     """Generate maximum operands"""
 
     def build_phase(self):
@@ -107,16 +112,17 @@ class MaxAluEnv(BaseAluEnv):
         self.tester = MaxTester("tester", self)
 
 
+# ## Creating RandomTest and MaxTest
 class RandomTest(uvm_test):
     """Run with random operands"""
     def build_phase(self):
-        self.env = RandomAluEnv("env", self)
+        self.env = RandomEnv("env", self)
 
 
 class MaxTest(uvm_test):
     """Run with max operands"""
     def build_phase(self):
-        self.env = MaxAluEnv("env", self)
+        self.env = MaxEnv("env", self)
 
 
 @cocotb.test()

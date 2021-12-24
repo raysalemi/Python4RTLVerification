@@ -101,7 +101,7 @@ async def deepcopy_test(_):
     logger.info(str(lha))
 
 
-@cocotb.test()
+@cocotb.test(expect_error=UVMNotImplemented)
 async def clone_test(_):
     """Show clone()"""
     lha = ListHolder("lha", ['A', 'B'])
