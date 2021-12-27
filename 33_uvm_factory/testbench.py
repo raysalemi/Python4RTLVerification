@@ -7,6 +7,8 @@ import sys
 sys.path.append(str(Path("..").resolve()))
 
 
+# # uvm_factory
+# ## The create() method
 class TinyComponent(uvm_component):
     async def run_phase(self):
         self.raise_objection()
@@ -34,6 +36,22 @@ async def tiny_factory_test(_):
     await uvm_root().run_test("TinyFactoryTest")
 
 
+# ## Creating objects with uvm_factory()
+class CreateTest(uvm_test):
+    def build_phase(self):
+        self.tc = uvm_factory().create_component_by_name(
+            "TinyComponent",
+            name="tc", parent=self)
+
+
+@cocotb.test()
+async def create_test(_):
+    """Create a component using factory"""
+    uvm_factory().clear_overrides()
+    await uvm_root().run_test("CreateTest")
+
+
+# ## Overriding types
 class MediumComponent(uvm_component):
     async def run_phase(self):
         self.raise_objection()
@@ -72,6 +90,7 @@ async def medium_name_test(_):
     await uvm_root().run_test("MediumNameTest")
 
 
+# ## Factory overrides by instance
 class TwoCompEnv(uvm_env):
     def build_phase(self):
         self.tc1 = TinyComponent.create("tc1", self)
@@ -91,15 +110,3 @@ async def two_comp_test(_):
     await uvm_root().run_test(TwoCompTest)
 
 
-class CreateTest(uvm_test):
-    def build_phase(self):
-        self.tc = uvm_factory().create_component_by_name(
-            "TinyComponent",
-            name="tc", parent=self)
-
-
-@cocotb.test()
-async def create_test(_):
-    """Create a component using factory"""
-    uvm_factory().clear_overrides()
-    await uvm_root().run_test("CreateTest")
