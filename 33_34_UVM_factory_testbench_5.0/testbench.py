@@ -59,6 +59,8 @@ class MediumNameTest(TinyFactoryTest):
             "TinyComponent", "MediumComponent")
         super().build_phase()
 
+
+class ReportFactoryState(MediumNameTest):
     def report_phase(self):
         uvm_factory().debug_level = 0
         uvm_factory_str = str(uvm_factory())
@@ -86,8 +88,7 @@ class TwoCompTest(uvm_test):
 @cocotb.test()
 async def two_comp_test(_):
     uvm_factory().clear_overrides()
-    await uvm_root().run_test("TwoCompTest")
-    uvm_factory().print(0)
+    await uvm_root().run_test(TwoCompTest)
 
 
 class CreateTest(uvm_test):
