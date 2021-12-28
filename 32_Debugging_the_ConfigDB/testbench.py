@@ -29,7 +29,7 @@ class MsgTest(uvm_test):
         ConfigDB().set(self, "env.loga", "MSG", "LOG A msg")
 
 
-@cocotb.test()
+@cocotb.test(expect_error=UVMConfigItemNotFound)
 async def log_msgs(_):
     await uvm_root().run_test(MsgTest)
 
@@ -43,7 +43,7 @@ class MsgTestAlmostFixed(uvm_test):
         ConfigDB().set(self, "env.logb", "MESG", "LOG B msg")
 
 
-@cocotb.test()
+@cocotb.test(expect_error=UVMConfigItemNotFound)
 async def log_msgs_almost(_):
     await uvm_root().run_test(MsgTestAlmostFixed)
 
