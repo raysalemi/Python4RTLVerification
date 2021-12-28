@@ -11,46 +11,51 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 class BaseTester(uvm_component):
 
-    def build_phase(self):
-        self.bpp = uvm_blocking_put_port("bpp", self)
+    def get_operands(self):
+        raise RuntimeError("You must extend BaseTester and override it.")
 
-    def create_operands(self):
-        return (0, 0)
+    def build_phase(self):
+        self.pp = uvm_put_port("pp", self)
 
     async def run_phase(self):
         self.raise_objection()
+        self.bfm = TinyAluBfm()
         ops = list(Ops)
         for op in ops:
-            aa, bb = self.create_operands()
-            await self.bpp.put((aa, bb, op))
-        await self.bpp.put((0, 0, Ops.ADD))
-        await self.bpp.put((0, 0, Ops.ADD))
-        await self.bpp.put((0, 0, Ops.ADD))
-        await self.bpp.put((0, 0, Ops.ADD))
+            aa, bb = self.get_operands()
+            cmd_tuple = (aa, bb, op)
+            await self.pp.put(cmd_tuple)
+        # send two dummy operations to allow
+        # last real operation to complete
+        await self.pp.put((0, 0, Ops.ADD))
+        await self.pp.put((0, 0, Ops.ADD))
+        await self.pp.put((0, 0, Ops.ADD))
+        await self.pp.put((0, 0, Ops.ADD))
         self.drop_objection()
 
 
+# ### RandomTester and MaxTester
 class RandomTester(BaseTester):
-    def create_operands(self):
-        return (random.randint(0, 255), random.randint(0, 255))
+    def get_operands(self):
+        return random.randint(0, 255), random.randint(0, 255)
 
 
 class MaxTester(BaseTester):
-    def create_operands(self):
-        return (0xFF, 0xFF)
+    def get_operands(self):
+        return 0xFF, 0xFF
 
 
 class Driver(uvm_driver):
 
     def build_phase(self):
-        self.bfm = ConfigDB().get(self, "", "BFM")
-        self.bgp = uvm_blocking_get_port("bgp", self)
+        self.bfm = TinyAluBfm()
+        self.gp = uvm_get_port("gp", self)
 
     async def run_phase(self):
         await self.bfm.reset()
         self.bfm.start_tasks()
         while True:
-            aa, bb, op = await self.bgp.get()
+            aa, bb, op = await self.gp.get()
             await self.bfm.send_op(aa, bb, op)
 
 
@@ -61,7 +66,7 @@ class Monitor(uvm_monitor):
 
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
-        self.bfm = ConfigDB().get(self, "", "BFM")
+        self.bfm = TinyAluBfm()
 
     async def run_phase(self):
         while True:
@@ -91,18 +96,16 @@ class Coverage(uvm_analysis_export):
 class Scoreboard(uvm_component):
 
     def build_phase(self):
-        self.cmd_export = uvm_analysis_export("cmd_export", self)
-        self.result_export = uvm_analysis_export("result_export", self)
         self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
         self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
-        self.cmd_gp = uvm_nonblocking_get_port("cmd_gp", self)
-        self.result_gp = uvm_nonblocking_get_port("result_gp", self)
+        self.cmd_gp = uvm_get_port("cmd_gp", self)
+        self.result_gp = uvm_get_port("result_gp", self)
 
     def connect_phase(self):
         self.cmd_export = self.cmd_mon_fifo.analysis_export
         self.result_export = self.result_mon_fifo.analysis_export
-        self.cmd_gp.connect(self.cmd_mon_fifo.nonblocking_get_export)
-        self.result_gp.connect(self.result_mon_fifo.nonblocking_get_export)
+        self.cmd_gp.connect(self.cmd_mon_fifo.get_export)
+        self.result_gp.connect(self.result_mon_fifo.get_export)
 
     def check_phase(self):
         passed = True
@@ -117,12 +120,12 @@ class Scoreboard(uvm_component):
                 raise RuntimeError(f"Missing result for command {cmd}")
             if actual == prediction:
                 self.logger.info(
-                    f"PASSED: {aa:x} {Ops(op).name} {bb:x} = {actual:x}")
+                    f"PASSED: {aa:02x} {Ops(op).name} {bb:02x} = {actual:04x}")
             else:
                 passed = False
                 self.logger.error(
-                    f"FAILED: {aa:x} {Ops(op).name} {bb:x} ="
-                    f" {actual:x} - predicted {prediction:x}")
+                    f"FAILED: {aa:02x} {Ops(op).name} {bb:02x} ="
+                    f" {actual:04x} - predicted {prediction:04x}")
         assert passed
 
 
@@ -130,8 +133,6 @@ class Environment(uvm_env):
     """Instantiate the BFM and scoreboard"""
 
     def build_phase(self):
-        bfm = TinyAluBfm()
-        ConfigDB().set(None, "*", "BFM", bfm)
         self.tester = RandomTester.create("tester", self)
         self.driver = Driver("driver", self)
         self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
@@ -141,8 +142,8 @@ class Environment(uvm_env):
         self.result_mon = Monitor("result_monitor", self, "get_result")
 
     def connect_phase(self):
-        self.tester.bpp.connect(self.cmd_fifo.put_export)
-        self.driver.bgp.connect(self.cmd_fifo.get_export)
+        self.tester.pp.connect(self.cmd_fifo.put_export)
+        self.driver.gp.connect(self.cmd_fifo.get_export)
 
         self.cmd_mon.ap.connect(self.coverage)
         self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
@@ -153,25 +154,24 @@ class Environment(uvm_env):
 class RandomTest(uvm_test):
     """Run with random operands"""
     def build_phase(self):
+        uvm_factory().set_type_override_by_type(BaseTester, RandomTester)
         self.env = Environment("env", self)
 
 
 class MaxTest(uvm_test):
     """Run with max operands"""
     def build_phase(self):
-        uvm_factory().set_type_override_by_type(RandomTester, MaxTester)
+        uvm_factory().set_type_override_by_type(BaseTester, MaxTester)
         self.env = Environment("env", self)
 
 
 @cocotb.test()
-async def random_test(dut):
+async def random_test(_):
     """Random operands"""
-    ConfigDB().set(None, "*", "DUT", dut)
-    await uvm_root().run_test("RandomTest")
+    await uvm_root().run_test(RandomTest)
 
 
 @cocotb.test()
-async def max_test(dut):
+async def max_test(_):
     """Maximum operands"""
-    ConfigDB().set(None, "*", "DUT", dut)
-    await uvm_root().run_test("MaxTest")
+    await uvm_root().run_test(MaxTest)
