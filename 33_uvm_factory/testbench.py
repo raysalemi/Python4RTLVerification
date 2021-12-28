@@ -128,7 +128,7 @@ async def print_inst_overrides(_):
 class LoggingOverrides(MediumNameTest):
     def final_phase(self):
         uvm_factory().debug_level = 0
-        factory_log = "\n"+str(uvm_factory())
+        factory_log = "\n" + str(uvm_factory())
         self.logger.info(factory_log)
 
 
