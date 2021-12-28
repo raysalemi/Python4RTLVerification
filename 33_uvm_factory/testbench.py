@@ -78,13 +78,6 @@ class MediumNameTest(TinyFactoryTest):
         super().build_phase()
 
 
-class ReportFactoryState(MediumNameTest):
-    def report_phase(self):
-        uvm_factory().debug_level = 0
-        uvm_factory_str = str(uvm_factory())
-        self.logger.info(uvm_factory_str)
-
-
 @cocotb.test()
 async def medium_name_test(_):
     await uvm_root().run_test("MediumNameTest")
@@ -110,3 +103,35 @@ async def two_comp_test(_):
     await uvm_root().run_test(TwoCompTest)
 
 
+# ## Debugging the uvm_factory()
+class PrintOverrides(MediumNameTest):
+    def final_phase(self):
+        uvm_factory().print(0)
+
+
+@cocotb.test()
+async def print_overrides(_):
+    await uvm_root().run_test(PrintOverrides)
+
+
+class PrintInstanceOverrides(TwoCompTest):
+    def final_phase(self):
+        uvm_factory().print(0)
+
+
+@cocotb.test()
+async def print_inst_overrides(_):
+    await uvm_root().run_test(PrintInstanceOverrides)
+
+
+# ### Logging uvm_factory() data
+class LoggingOverrides(MediumNameTest):
+    def final_phase(self):
+        uvm_factory().debug_level = 0
+        factory_log = "\n"+str(uvm_factory())
+        self.logger.info(factory_log)
+
+
+@cocotb.test()
+async def log_overrides(_):
+    await uvm_root().run_test(LoggingOverrides)
