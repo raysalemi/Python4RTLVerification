@@ -5,6 +5,8 @@ import statistics
 # Mailbox example
 
 
+# # Analysis ports
+# ## The uvm_analysis_port
 class NumberGenerator(uvm_component):
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
@@ -19,6 +21,7 @@ class NumberGenerator(uvm_component):
         self.drop_objection()
 
 
+# ## Extending the uvm_analysis_export class
 class Adder(uvm_analysis_export):
     def start_of_simulation_phase(self):
         self.sum = 0
@@ -45,6 +48,7 @@ async def add_test(_):
     await uvm_root().run_test("AdderTest")
 
 
+# ## Instantiate a uvm_tlm_analysis_fifo
 class Average(uvm_component):
     def build_phase(self):
         self.fifo = uvm_tlm_analysis_fifo("fifo", self)
@@ -82,6 +86,7 @@ async def avg_test(_):
     await uvm_root().run_test("AverageTest")
 
 
+# ## Extend the uvm_subscriber class
 class Median(uvm_subscriber):
 
     def start_of_simulation_phase(self):

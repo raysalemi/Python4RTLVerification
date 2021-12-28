@@ -9,7 +9,7 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
-# ## Converting the testers to UVM components
+# # UVM Factory testbench 5.0
 # ### BaseTester
 class BaseTester(uvm_component):
 
@@ -88,7 +88,7 @@ class Scoreboard(uvm_component):
         assert passed
 
 
-# ## Using an environment
+# ## AluEnv
 class AluEnv(uvm_env):
     """Instantiate the scoreboard"""
 
@@ -100,7 +100,7 @@ class AluEnv(uvm_env):
         TinyAluBfm().start_tasks()
 
 
-# ## Creating RandomTest and MaxTest
+# ## RandomTest
 class RandomTest(uvm_test):
     """Run with random operands"""
     def build_phase(self):
@@ -108,6 +108,7 @@ class RandomTest(uvm_test):
         self.env = AluEnv("env", self)
 
 
+# ## MaxTest
 class MaxTest(uvm_test):
     """Run with max operands"""
     def build_phase(self):

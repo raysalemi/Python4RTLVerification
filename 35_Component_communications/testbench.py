@@ -3,6 +3,8 @@ from cocotb.triggers import Timer
 from pyuvm import *
 
 
+# # Component communication
+# ## Ports
 class BlockingProducer(uvm_component):
     def build_phase(self):
         self.bpp = uvm_blocking_put_port("bpp", self)
@@ -25,6 +27,7 @@ class BlockingConsumer(uvm_component):
             self.logger.info(f"Got {nn}")
 
 
+# ## uvm_tlm_fifo
 class BlockingTest(uvm_test):
     def build_phase(self):
         self.producer = BlockingProducer("producer", self)
@@ -39,9 +42,10 @@ class BlockingTest(uvm_test):
 @cocotb.test()
 async def blocking_test(_):
     """Demonstrate blocking"""
-    await uvm_root().run_test("BlockingTest")
+    await uvm_root().run_test(BlockingTest)
 
 
+# ## Non-blocking communication in pyuvm
 class NonBlockingProducer(uvm_component):
     def build_phase(self):
         self.nbpp = uvm_nonblocking_put_port("nbpp", self)
@@ -57,8 +61,8 @@ class NonBlockingProducer(uvm_component):
                     self.logger.info(f"Put {nn}")
                 else:
                     self.logger.info("FIFO full")
-                    await Timer(1, units="us")
-        await Timer(3, units="us")
+                    await Timer(1, units="ns")
+        await Timer(3, units="ns")
         self.drop_objection()
 
 
@@ -75,7 +79,7 @@ class NonBlockingConsumer(uvm_component):
                     self.logger.info(f"Got {nn}")
                 else:
                     self.logger.info("FIFO empty")
-                    await Timer(3, units="us")
+                    await Timer(3, units="ns")
 
 
 class NonBlockingTest(uvm_test):
@@ -89,6 +93,7 @@ class NonBlockingTest(uvm_test):
         self.consumer.nbgp.connect(self.fifo.get_export)
 
 
+# ## Debugging uvm_tlm_fifo
 class LoggedBlockingtest(BlockingTest):
     def end_of_elaboration_phase(self):
         self.fifo.set_logging_level_hier(FIFO_DEBUG)
