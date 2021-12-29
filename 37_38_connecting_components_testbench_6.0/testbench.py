@@ -1,4 +1,5 @@
 import cocotb
+from cocotb.triggers import ClockCycles
 from pyuvm import *
 import random
 from pathlib import Path
@@ -9,10 +10,10 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
-class BaseTester(uvm_component):
+# # Testbench components
+# ## The testers
 
-    def get_operands(self):
-        raise RuntimeError("You must extend BaseTester and override it.")
+class BaseTester(uvm_component):
 
     def build_phase(self):
         self.pp = uvm_put_port("pp", self)
@@ -25,13 +26,12 @@ class BaseTester(uvm_component):
             aa, bb = self.get_operands()
             cmd_tuple = (aa, bb, op)
             await self.pp.put(cmd_tuple)
-        # send two dummy operations to allow
-        # last real operation to complete
-        await self.pp.put((0, 0, Ops.ADD))
-        await self.pp.put((0, 0, Ops.ADD))
-        await self.pp.put((0, 0, Ops.ADD))
-        await self.pp.put((0, 0, Ops.ADD))
+        await ClockCycles(signal=cocotb.top.clk, num_cycles=10,
+                          rising=False)
         self.drop_objection()
+
+    def get_operands(self):
+        raise RuntimeError("You must extend BaseTester and override it.")
 
 
 # ### RandomTester and MaxTester
@@ -45,6 +45,7 @@ class MaxTester(BaseTester):
         return 0xFF, 0xFF
 
 
+# ## Driver
 class Driver(uvm_driver):
 
     def build_phase(self):
@@ -59,6 +60,7 @@ class Driver(uvm_driver):
             await self.bfm.send_op(aa, bb, op)
 
 
+# ## Monitor
 class Monitor(uvm_monitor):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
@@ -67,14 +69,15 @@ class Monitor(uvm_monitor):
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
         self.bfm = TinyAluBfm()
+        self.get_method = getattr(self.bfm, self.method_name)
 
     async def run_phase(self):
         while True:
-            get_method = getattr(self.bfm, self.method_name)
-            datum = await get_method()
+            datum = await self.get_method()
             self.ap.write(datum)
 
 
+# ## Coverage
 class Coverage(uvm_analysis_export):
     def start_of_simulation_phase(self):
         self.cvg = set()
@@ -83,16 +86,16 @@ class Coverage(uvm_analysis_export):
         _, _, op = cmd
         self.cvg.add(Ops(op))
 
-    def report_phase(self):
+    def check_phase(self):
         if len(set(Ops) - self.cvg) > 0:
             self.logger.error(
                 f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
             assert False
         else:
             self.logger.info("Covered all operations")
-            assert True
 
 
+# ## Scoreboard
 class Scoreboard(uvm_component):
 
     def build_phase(self):
@@ -102,22 +105,22 @@ class Scoreboard(uvm_component):
         self.result_gp = uvm_get_port("result_gp", self)
 
     def connect_phase(self):
-        self.cmd_export = self.cmd_mon_fifo.analysis_export
-        self.result_export = self.result_mon_fifo.analysis_export
         self.cmd_gp.connect(self.cmd_mon_fifo.get_export)
         self.result_gp.connect(self.result_mon_fifo.get_export)
+        self.cmd_export = self.cmd_mon_fifo.analysis_export
+        self.result_export = self.result_mon_fifo.analysis_export
 
     def check_phase(self):
         passed = True
         while True:
-            success, cmd = self.cmd_gp.try_get()
-            if not success:
+            got_next_cmd, cmd = self.cmd_gp.try_get()
+            if not got_next_cmd:
                 break
-            (aa, bb, op) = cmd
-            prediction = alu_prediction(aa, bb, Ops(op))
             result_exists, actual = self.result_gp.try_get()
             if not result_exists:
                 raise RuntimeError(f"Missing result for command {cmd}")
+            (aa, bb, op) = cmd
+            prediction = alu_prediction(aa, bb, Ops(op))
             if actual == prediction:
                 self.logger.info(
                     f"PASSED: {aa:02x} {Ops(op).name} {bb:02x} = {actual:04x}")
@@ -129,11 +132,11 @@ class Scoreboard(uvm_component):
         assert passed
 
 
-class Environment(uvm_env):
-    """Instantiate the BFM and scoreboard"""
+class AluEnv(uvm_env):
 
+    # ### AluEnv.build_phase()
     def build_phase(self):
-        self.tester = RandomTester.create("tester", self)
+        self.tester = BaseTester.create("tester", self)
         self.driver = Driver("driver", self)
         self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
         self.scoreboard = Scoreboard("scoreboard", self)
@@ -141,6 +144,7 @@ class Environment(uvm_env):
         self.cmd_mon = Monitor("cmd_monitor", self, "get_cmd")
         self.result_mon = Monitor("result_monitor", self, "get_result")
 
+    # ### AluEnv.connect_phase()
     def connect_phase(self):
         self.tester.pp.connect(self.cmd_fifo.put_export)
         self.driver.gp.connect(self.cmd_fifo.get_export)
@@ -151,27 +155,24 @@ class Environment(uvm_env):
         self.result_mon.ap.connect(self.scoreboard.result_export)
 
 
+# ## `RandomTest` and `MaxTest`
 class RandomTest(uvm_test):
-    """Run with random operands"""
     def build_phase(self):
         uvm_factory().set_type_override_by_type(BaseTester, RandomTester)
-        self.env = Environment("env", self)
+        self.env = AluEnv("env", self)
 
 
 class MaxTest(uvm_test):
-    """Run with max operands"""
     def build_phase(self):
         uvm_factory().set_type_override_by_type(BaseTester, MaxTester)
-        self.env = Environment("env", self)
+        self.env = AluEnv("env", self)
 
 
 @cocotb.test()
 async def random_test(_):
-    """Random operands"""
     await uvm_root().run_test(RandomTest)
 
 
 @cocotb.test()
 async def max_test(_):
-    """Maximum operands"""
     await uvm_root().run_test(MaxTest)

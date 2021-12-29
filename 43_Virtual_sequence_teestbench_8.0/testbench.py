@@ -1,4 +1,4 @@
-from cocotb.triggers import Join, Combine
+from cocotb.triggers import Combine
 from pyuvm import *
 import random
 import cocotb
@@ -9,74 +9,45 @@ from pathlib import Path
 sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
-# Sequence classes
 
+# # Virtual sequence testbench: 8.0
+# ## Launching sequences from a virtual sequence
+class AluTest(uvm_test):
+    def build_phase(self):
+        self.env = AluEnv("env", self)
 
-class AluSeqItem(uvm_sequence_item):
+    def end_of_elaboration_phase(self):
+        self.test_all = TestAllSeq.create("test_all")
 
-    def __init__(self, name, aa, bb, op):
-        super().__init__(name)
-        self.A = aa
-        self.B = bb
-        self.op = Ops(op)
-
-    def randomize_operands(self):
-        self.A = random.randint(0, 255)
-        self.B = random.randint(0, 255)
-
-    def randomize(self):
-        self.randomize_operands()
-        self.op = random.choice(list(Ops))
-
-    def __eq__(self, other):
-        same = self.A == other.A and self.B == other.B and self.op == other.op
-        return same
-
-    def __str__(self):
-        return f"{self.get_name()} : A: 0x{self.A:02x} \
-        OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
-
-
-class RandomSeq(uvm_sequence):
-    async def body(self):
-        for op in list(Ops):
-            cmd_tr = AluSeqItem("cmd_tr", None, None, op)
-            await self.start_item(cmd_tr)
-            cmd_tr.randomize_operands()
-            await self.finish_item(cmd_tr)
-
-
-class MaxSeq(uvm_sequence):
-    async def body(self):
-        for op in list(Ops):
-            cmd_tr = AluSeqItem("cmd_tr", 0xff, 0xff, op)
-            await self.start_item(cmd_tr)
-            await self.finish_item(cmd_tr)
+    async def run_phase(self):
+        self.raise_objection()
+        await self.test_all.start()
+        self.drop_objection()
 
 
 class TestAllSeq(uvm_sequence):
 
     async def body(self):
         seqr = ConfigDB().get(None, "", "SEQR")
-        random = RandomSeq("random")
-        max = MaxSeq("max")
-        await random.start(seqr)
-        await max.start(seqr)
+        rand_seq = RandomSeq("random")
+        max_seq = MaxSeq("max")
+        await rand_seq.start(seqr)
+        await max_seq.start(seqr)
 
 
-class TestAllForkSeq(uvm_sequence):
+class TestAllParallelSeq(uvm_sequence):
 
     async def body(self):
         seqr = ConfigDB().get(None, "", "SEQR")
-        random = RandomSeq("random")
-        max = MaxSeq("max")
-        random_task = cocotb.fork(random.start(seqr))
-        max_task = cocotb.fork(max.start(seqr))
-        await Combine(Join(random_task), Join(max_task))
-
-# Sequence library example
+        random_seq = RandomSeq("random")
+        max_seq = MaxSeq("max")
+        random_task = cocotb.start_soon(random_seq.start(seqr))
+        max_task = cocotb.start_soon(max_seq.start(seqr))
+        await Combine(random_task, max_task)
 
 
+# ## Creating a programming interface
+# ### OpSeq
 class OpSeq(uvm_sequence):
     def __init__(self, name, aa, bb, op):
         super().__init__(name)
@@ -92,6 +63,7 @@ class OpSeq(uvm_sequence):
         self.result = seq_item.result
 
 
+# ### TinyALU programming interface
 async def do_add(seqr, aa, bb):
     seq = OpSeq("seq", aa, bb, Ops.ADD)
     await seq.start(seqr)
@@ -131,7 +103,48 @@ class FibonacciSeq(uvm_sequence):
             prev_num = cur_num
             cur_num = sum
         uvm_root().logger.info("Fibonacci Sequence: " + str(fib_list))
-        uvm_root().set_logging_level_hier(CRITICAL)
+
+
+class AluSeqItem(uvm_sequence_item):
+
+    def __init__(self, name, aa, bb, op):
+        super().__init__(name)
+        self.A = aa
+        self.B = bb
+        self.op = Ops(op)
+
+    def __eq__(self, other):
+        same = self.A == other.A and self.B == other.B and self.op == other.op
+        return same
+
+    def __str__(self):
+        return f"{self.get_name()} : A: 0x{self.A:02x} \
+        OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
+
+
+class BaseSeq(uvm_sequence):
+
+    async def body(self):
+        for op in list(Ops):
+            cmd_tr = AluSeqItem("cmd_tr", 0, 0, op)
+            await self.start_item(cmd_tr)
+            self.set_operands(cmd_tr)
+            await self.finish_item(cmd_tr)
+
+    def set_operands(self, tr):
+        pass
+
+
+class RandomSeq(BaseSeq):
+    def set_operands(self, tr):
+        tr.A = random.randint(0, 255)
+        tr.B = random.randint(0, 255)
+
+
+class MaxSeq(BaseSeq):
+    def set_operands(self, tr):
+        tr.A = 0xff
+        tr.B = 0xff
 
 
 class Driver(uvm_driver):
@@ -158,20 +171,20 @@ class Driver(uvm_driver):
 
 class Coverage(uvm_subscriber):
 
-    def end_of_elaboration_phase(self):
+    def start_of_simulation_phase(self):
         self.cvg = set()
+        try:
+            self.disable_errors = ConfigDB().get(
+                self, "", "DISABLE_COVERAGE_ERRORS")
+        except UVMConfigItemNotFound:
+            self.disable_errors = False
 
     def write(self, cmd):
         (_, _, op) = cmd
         self.cvg.add(op)
 
     def report_phase(self):
-        try:
-            disable_errors = ConfigDB().get(
-                self, "", "DISABLE_COVERAGE_ERRORS")
-        except UVMConfigItemNotFound:
-            disable_errors = False
-        if not disable_errors:
+        if not self.disable_errors:
             if len(set(Ops) - self.cvg) > 0:
                 self.logger.error(
                     f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
@@ -247,28 +260,17 @@ class AluEnv(uvm_env):
         self.driver.ap.connect(self.scoreboard.result_export)
 
 
-class AluTest(uvm_test):
-    def build_phase(self):
-        self.env = AluEnv("env", self)
-
-    def end_of_elaboration_phase(self):
-        self.test_all = TestAllSeq.create("test_all")
-
-    async def run_phase(self):
-        self.raise_objection()
-        await self.test_all.start()
-        self.drop_objection()
-
-
 class ParallelTest(AluTest):
     def end_of_elaboration_phase(self):
-        uvm_factory().set_type_override_by_type(TestAllSeq, TestAllForkSeq)
+        uvm_factory().set_type_override_by_type(
+            TestAllSeq, TestAllParallelSeq)
         return super().end_of_elaboration_phase()
 
 
 class FibonacciTest(AluTest):
     def end_of_elaboration_phase(self):
         ConfigDB().set(None, "*", "DISABLE_COVERAGE_ERRORS", True)
+        self.env.set_logging_level_hier(CRITICAL)
         uvm_factory().set_type_override_by_type(TestAllSeq, FibonacciSeq)
         return super().end_of_elaboration_phase()
 

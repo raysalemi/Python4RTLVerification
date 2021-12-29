@@ -1,5 +1,4 @@
 from pyuvm import *
-import random
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 import sys
@@ -8,31 +7,8 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 
-class AluSeqItem(uvm_sequence_item):
-
-    def __init__(self, name, aa, bb, op):
-        super().__init__(name)
-        self.A = aa
-        self.B = bb
-        self.op = Ops(op)
-
-    def randomize_operands(self):
-        self.A = random.randint(0, 255)
-        self.B = random.randint(0, 255)
-
-    def randomize(self):
-        self.randomize_operands()
-        self.op = random.choice(list(Ops))
-
-    def __eq__(self, other):
-        same = self.A == other.A and self.B == other.B and self.op == other.op
-        return same
-
-    def __str__(self):
-        return f"{self.get_name()} : A: 0x{self.A:02x} \
-        OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
-
-
+# # Fibonacci using `get_response()` testbench: 7.2
+# ## AluResultItem
 class AluResultItem(uvm_sequence_item):
     def __init__(self, name, result):
         super().__init__(name)
@@ -42,6 +18,8 @@ class AluResultItem(uvm_sequence_item):
         return f"RESULT: {self.result}"
 
 
+# ## Driver
+
 class Driver(uvm_driver):
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
@@ -49,24 +27,9 @@ class Driver(uvm_driver):
     def start_of_simulation_phase(self):
         self.bfm = TinyAluBfm()
 
-    async def launch_tb(self):
+    async def run_phase(self):
         await self.bfm.reset()
         self.bfm.start_tasks()
-
-    async def run_phase(self):
-        await self.launch_tb()
-        while True:
-            cmd = await self.seq_item_port.get_next_item()
-            await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
-            result = await self.bfm.get_result()
-            self.ap.write(result)
-            cmd.result = result
-            self.seq_item_port.item_done()
-
-
-class ResponseDriver(Driver):
-    async def run_phase(self):
-        await self.launch_tb()
         while True:
             cmd = await self.seq_item_port.get_next_item()
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
@@ -77,9 +40,62 @@ class ResponseDriver(Driver):
             self.seq_item_port.item_done(result_item)
 
 
-class Coverage(uvm_subscriber):
+class FibonacciSeq(uvm_sequence):
+    async def body(self):
+        prev_num = 0
+        cur_num = 1
+        fib_list = [prev_num, cur_num]
+        cmd = AluSeqItem("cmd", None, None, Ops.ADD)
+        for _ in range(7):
+            await self.start_item(cmd)
+            cmd.A = prev_num
+            cmd.B = cur_num
+            await self.finish_item(cmd)
+            rsp = await self.get_response()
+            fib_list.append(rsp.result)
+            prev_num = cur_num
+            cur_num = rsp.result
+        logger = ConfigDB().get(None, "", "LOGGER")
+        logger.info("Fibonacci Sequence: " + str(fib_list))
 
-    def end_of_elaboration_phase(self):
+
+class AluEnv(uvm_env):
+
+    # ## Connecting the driver to the sequencer
+    def build_phase(self):
+        self.seqr = uvm_sequencer("seqr", self)
+        ConfigDB().set(None, "*", "SEQR", self.seqr)
+        self.driver = Driver("driver", self)
+        self.cmd_mon = Monitor("cmd_mon", self, "get_cmd")
+        self.scoreboard = Scoreboard("scoreboard", self)
+        self.coverage = Coverage("coverage", self)
+
+    def connect_phase(self):
+        self.driver.seq_item_port.connect(self.seqr.seq_item_export)
+        self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
+        self.cmd_mon.ap.connect(self.coverage.analysis_export)
+        self.driver.ap.connect(self.scoreboard.result_export)
+
+
+class AluSeqItem(uvm_sequence_item):
+
+    def __init__(self, name, aa, bb, op):
+        super().__init__(name)
+        self.A = aa
+        self.B = bb
+        self.op = Ops(op)
+
+    def __eq__(self, other):
+        same = self.A == other.A and self.B == other.B and self.op == other.op
+        return same
+
+    def __str__(self):
+        return f"{self.get_name()} : A: 0x{self.A:02x} \
+        OP: {self.op.name} ({self.op.value}) B: 0x{self.B:02x}"
+
+
+class Coverage(uvm_subscriber):
+    def start_of_simulation_phase(self):
         self.cvg = set()
         try:
             self.disable_errors = ConfigDB().get(
@@ -92,12 +108,7 @@ class Coverage(uvm_subscriber):
         self.cvg.add(op)
 
     def report_phase(self):
-        try:
-            disable_errors = ConfigDB().get(
-                self, "", "DISABLE_COVERAGE_ERRORS")
-        except UVMConfigItemNotFound:
-            disable_errors = False
-        if not disable_errors:
+        if not self.disable_errors:
             if len(set(Ops) - self.cvg) > 0:
                 self.logger.error(
                     f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
@@ -143,8 +154,8 @@ class Scoreboard(uvm_component):
 class Monitor(uvm_component):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
-        bfm = TinyAluBfm()
-        self.get_method = getattr(bfm, method_name)
+        self.bfm = TinyAluBfm()
+        self.get_method = getattr(self.bfm, method_name)
 
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
@@ -154,60 +165,6 @@ class Monitor(uvm_component):
             datum = await self.get_method()
             self.logger.debug(f"MONITORED {datum}")
             self.ap.write(datum)
-
-
-class AluEnv(uvm_env):
-
-    def build_phase(self):
-        self.seqr = uvm_sequencer("seqr", self)
-        ConfigDB().set(None, "*", "SEQR", self.seqr)
-        self.driver = Driver.create("driver", self)
-        self.cmd_mon = Monitor("cmd_mon", self, "get_cmd")
-        self.coverage = Coverage("coverage", self)
-        self.scoreboard = Scoreboard("scoreboard", self)
-
-    def connect_phase(self):
-        self.driver.seq_item_port.connect(self.seqr.seq_item_export)
-        self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
-        self.cmd_mon.ap.connect(self.coverage.analysis_export)
-        self.driver.ap.connect(self.scoreboard.result_export)
-
-
-class FibonacciSeq(uvm_sequence):
-    async def body(self):
-        prev_num = 0
-        cur_num = 1
-        fib_list = [prev_num, cur_num]
-        cmd = AluSeqItem("cmd", None, None, Ops.ADD)
-        for _ in range(7):
-            await self.start_item(cmd)
-            cmd.A = prev_num
-            cmd.B = cur_num
-            await self.finish_item(cmd)
-            fib_list.append(cmd.result)
-            prev_num = cur_num
-            cur_num = cmd.result
-        logger = ConfigDB().get(None, "", "LOGGER")
-        logger.info("Fibonacci Sequence: " + str(fib_list))
-
-
-class ResponseFibSeq(uvm_sequence):
-    async def body(self):
-        prev_num = 0
-        cur_num = 1
-        fib_list = [prev_num, cur_num]
-        cmd = AluSeqItem("cmd", None, None, Ops.ADD)
-        for _ in range(7):
-            await self.start_item(cmd)
-            cmd.A = prev_num
-            cmd.B = cur_num
-            await self.finish_item(cmd)
-            rsp = await self.get_response()
-            fib_list.append(rsp.result)
-            prev_num = cur_num
-            cur_num = rsp.result
-        logger = ConfigDB().get(None, "", "LOGGER")
-        logger.info("Fibonacci Sequence: " + str(fib_list))
 
 
 class FibonacciTest(uvm_test):
@@ -227,20 +184,6 @@ class FibonacciTest(uvm_test):
         self.drop_objection()
 
 
-class ResponseFibTest(FibonacciTest):
-    def build_phase(self):
-        uvm_factory().set_type_override_by_type(Driver, ResponseDriver)
-        uvm_factory().set_type_override_by_type(FibonacciSeq, ResponseFibSeq)
-        super().build_phase()
-
-
 @cocotb.test()
-async def fibonacci_test(dut):
-    """Run Fibonacci sequence"""
-    await uvm_root().run_test("FibonacciTest")
-
-
-@cocotb.test()
-async def response_fib_test(dut):
-    """Show get_response"""
-    await uvm_root().run_test("ResponseFibTest")
+async def fibonaaci_test(dut):
+    await uvm_root().run_test(FibonacciTest)

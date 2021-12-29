@@ -9,8 +9,10 @@ sys.path.append(str(Path("..").resolve()))
 from tinyalu_utils import logger  # noqa: E402
 
 
-class UserRecord(uvm_object):
-    def __init__(self, name, id_number):
+# ## Creating a string from an object
+# ## Comparing objects
+class PersonRecord(uvm_object):
+    def __init__(self, name="", id_number=None):
         super().__init__(name)
         self.id_number = id_number
 
@@ -20,93 +22,87 @@ class UserRecord(uvm_object):
     def __eq__(self, other):
         return self.id_number == other.id_number
 
+    def do_copy(self, other):
+        super().do_copy(other)
+        self.id_number = other.id_number
+
 
 @cocotb.test()
 async def test_str(_):
-    """Test __str__()"""
-    xx = UserRecord("Joe Shmoe", 37)
-    print(xx)
-    logger.info(str(xx))
+    xx = PersonRecord("Joe Shmoe", 37)
+    print("Printing the record:", xx)
+    logger.info("Logging the record: " + str(xx))
 
 
 @cocotb.test()
 async def test_eq(_):
-    """Test __eq__()"""
-    batman = UserRecord("Batman", 27)
-    bruce_wayne = UserRecord("Bruce Wayne", 27)
+    batman = PersonRecord("Batman", 27)
+    bruce_wayne = PersonRecord("Bruce Wayne", 27)
     if batman == bruce_wayne:
         logger.info("Batman is really Bruce Wayne!")
     else:
         logger.info("Who is Batman?")
 
 
-class ListHolder(uvm_object):
-    def __init__(self, name='', list=[]):
-        super().__init__(name=name)
-        self.list = list
+# ## Copying and cloning
+class StudentRecord(PersonRecord):
+    def __init__(self, name="", id_number=None, grades=[]):
+        super().__init__(name, id_number)
+        self.grades = grades
 
     def __str__(self):
-        return f"{self.get_name()}: {self.list} "
+        return super().__str__() + f" Grades: {self.grades}"
+
+# ### do_copy()
+    def do_copy(self, other):
+        super().do_copy(other)
+        self.grades = list(other.grades)
+
+
+# ### Copying with Python
+@cocotb.test()
+async def copy_copy_test(_):
+    mary = StudentRecord("Mary", 33, [97, 82])
+    mary_copy = StudentRecord()
+    mary_copy = copy.copy(mary)
+    print("mary:     ", mary)
+    print("mary_copy:", mary_copy)
+    print("-- grades are SAME id --")
+    print("id(mary.grades):     ", id(mary.grades))
+    print("id(mary_copy.grades):", id(mary_copy.grades))
 
 
 @cocotb.test()
-async def obj_test(_):
-    """Show obj handles"""
-    lha = ListHolder("lha", ['A', 'B'])
-    lhb = lha
-    logger.info(f"lha_id: {id(lha)}, lhb_id: {id(lhb)} ")
-    lhb.list.append("C")  # change lhb
-    logger.info(str(lha))
+async def copy_deepcopy_test(_):
+    mary = StudentRecord("Mary", 33, [97, 82])
+    mary_copy = StudentRecord()
+    mary_copy = copy.deepcopy(mary)
+    print("mary:     ", mary)
+    print("mary_copy:", mary_copy)
+    print("-- grades are DIFFERENT id --")
+    print("id(mary.grades):     ", id(mary.grades))
+    print("id(mary_copy.grades):", id(mary_copy.grades))
 
 
-class ShallowListHolder(ListHolder):
-    def do_copy(self, rhs):
-        self.list = rhs.list
+# ## Copying with the UVM
+@cocotb.test()
+async def copy_test(_):
+    mary = StudentRecord("Mary", 33, [97, 82])
+    mary_copy = StudentRecord()
+    mary_copy.copy(mary)
+    print("mary:     ", mary)
+    print("mary_copy:", mary_copy)
+    print("-- grades are different ids --")
+    print("id(mary.grades):     ", id(mary.grades))
+    print("id(mary_copy.grades):", id(mary_copy.grades))
 
 
 @cocotb.test()
-async def shallow_test(_):
-    """Show shallow copy"""
-    lha = ShallowListHolder("lha", ['A', 'B'])
-    lhb = ShallowListHolder(lha.get_name())
-    lhb.copy(lha)
-    logger.info(f"lha_id: {id(lha)}, lhb_id: {id(lhb)} ")
-    lhb.list.append("C")  # change lhb
-    logger.info(str(lha))
-
-
-class DeepListHolder(ListHolder):
-    def do_copy(self, rhs):
-        self.list = list(rhs.list)
-
-
-@cocotb.test()
-async def deep_test(_):
-    """Show deep copy"""
-    lha = DeepListHolder("lha", ['A', 'B'])
-    lhb = DeepListHolder(lha.get_name())
-    lhb.copy(lha)
-    logger.info(f"lha_id: {id(lha)}, lhb_id: {id(lhb)} ")
-    lhb.list.append("C")  # change lhb
-    logger.info(str(lha))
-
-
-@cocotb.test()
-async def deepcopy_test(_):
-    """Show copy.deepcopy()"""
-    lha = DeepListHolder("lha", ['A', 'B'])
-    lhb = copy.deepcopy(lha)
-    logger.info(f"lha_id: {id(lha)}, lhb_id: {id(lhb)} ")
-    lhb.list.append("C")  # change lhb
-    logger.info(str(lha))
-
-
-@cocotb.test(expect_error=UVMNotImplemented)
 async def clone_test(_):
-    """Show clone()"""
-    lha = ListHolder("lha", ['A', 'B'])
-    lhb = lha.clone()
-    logger.info(f"lha_id: {id(lha)}, lhb_id: {id(lhb)} ")
-    lhb.list.append("C")  # change lhb
-    logger.info(str(lha))
-    logger.info(str(lhb))
+    mary = StudentRecord("Mary", 33, [97, 82])
+    mary_copy = mary.clone()
+    print("mary:     ", mary)
+    print("mary_copy:", mary_copy)
+    print("-- grades are different ids --")
+    print("id(mary.grades):     ", id(mary.grades))
+    print("id(mary_copy.grades):", id(mary_copy.grades))
