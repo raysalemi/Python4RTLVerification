@@ -1,5 +1,10 @@
 # Python for UVM Verification Examples
 I've tested all the code examples in *Python for UVM Verification* using either Jupyter notebooks or **cocotb** directories. The notebook and directory names match the chapter headings.
+## Installing cocotb
+It is best to install **cocotb** before installing pyuvm, especially on Windows.
+
+You can find [cocotb installation instructions](https://docs.cocotb.org/en/stable/install.html) on the **cocotb.org** website.
+
 ## Jupyter Notebooks
 I used Jupyter notebooks for the Python-only examples. The easiest way to use these notebooks is to install Jupyter using `pip`:
 ```
