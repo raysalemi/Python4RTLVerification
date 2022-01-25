@@ -24,7 +24,9 @@ async def wait_2ns(_):
 
 
 # ## Starting tasks
-async def counter(name, delay, count, ):
+async def counter(
+    name, delay, count,
+):
     """Counts up to the count argument after delay"""
     for ii in range(1, count + 1):
         await Timer(delay, units="ns")

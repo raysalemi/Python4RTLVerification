@@ -10,7 +10,6 @@ logger.setLevel(logging.INFO)
 
 
 # ## Blocking communication
-
 async def Producer(queue, nn, delay=None):
     """Produce numbers from 1 to nn and send them"""
     for datum in range(1, nn + 1):
@@ -28,7 +27,6 @@ async def Consumer(queue):
 
 
 # ### An infinitely long queue
-
 @cocotb.test()
 async def infinte_queue(_):
     """Show an infinite queue"""
@@ -39,7 +37,6 @@ async def infinte_queue(_):
 
 
 # ### A Queue of size 1
-
 @cocotb.test()
 async def queue_max_size_1(_):
     """Show producer and consumer with maxsize 1"""
@@ -50,7 +47,6 @@ async def queue_max_size_1(_):
 
 
 # ### Queues and simulation delay
-
 @cocotb.test()
 async def producer_consumer_sim_delay(_):
     """Show producer and consumer with simulation delay"""
@@ -62,7 +58,6 @@ async def producer_consumer_sim_delay(_):
 
 
 # ### Non-blocking communication
-
 async def ProducerNoWait(queue, nn, delay=None):
     """Produce numbers from 1 to nn and send them"""
     for datum in range(1, nn + 1):
