@@ -13,7 +13,7 @@ from pathlib import Path
 parent_path = Path("..").resolve()
 
 import sys  # noqa: E402
-sys.path.append(str(parent_path))
+sys.path.insert(0, str(parent_path))
 
 from tinyalu_utils import Ops, alu_prediction, logger, get_int  # noqa: E402
 

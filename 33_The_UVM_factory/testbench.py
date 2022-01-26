@@ -1,10 +1,5 @@
 import cocotb
 from pyuvm import *
-from pathlib import Path
-import sys
-# All testbenches use tinyalu_utils, so store it in a central
-# place and add its path to the sys path so we can import it
-sys.path.append(str(Path("..").resolve()))
 
 
 # # uvm_factory

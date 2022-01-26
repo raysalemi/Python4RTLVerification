@@ -5,7 +5,7 @@ from pyuvm import *
 # place and add its path to the sys path so we can import it
 import sys
 from pathlib import Path
-sys.path.append(str(Path("..").resolve()))
+sys.path.insert(0, str(Path("..").resolve()))
 from tinyalu_utils import logger  # noqa: E402
 
 
