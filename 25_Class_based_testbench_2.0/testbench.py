@@ -91,13 +91,13 @@ class Scoreboard():
 
 # ## The execute_test() coroutine
 
-async def execute_test(TesterClass):
+async def execute_test(tester_class):
     bfm = TinyAluBfm()
     scoreboard = Scoreboard()
     await bfm.reset()
     bfm.start_tasks()
     scoreboard.start_tasks()
-    tester = TesterClass()
+    tester = tester_class()
     await tester.execute()
     passed = scoreboard.check_results()
     return passed

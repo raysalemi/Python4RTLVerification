@@ -28,7 +28,7 @@ async def Consumer(queue):
 
 # ### An infinitely long queue
 @cocotb.test()
-async def infinte_queue(_):
+async def infinite_queue(_):
     """Show an infinite queue"""
     queue = Queue()
     cocotb.start_soon(Consumer(queue))
@@ -63,11 +63,10 @@ async def ProducerNoWait(queue, nn, delay=None):
     for datum in range(1, nn + 1):
         if delay is not None:
             await Timer(delay, units="ns")
-        sent = False
-        while not sent:
+        while True:
             try:
                 queue.put_nowait(datum)
-                sent = True
+                break
             except QueueFull:
                 logger.info("Queue Full, waiting 1ns")
                 await Timer(1, units="ns")
@@ -77,11 +76,10 @@ async def ProducerNoWait(queue, nn, delay=None):
 async def ConsumerNoWait(queue):
     """Get numbers and print them to the log"""
     while True:
-        got = False
-        while not got:
+        while True:
             try:
                 datum = queue.get_nowait()
-                got = True
+                break
             except QueueEmpty:
                 logger.info("Queue Empty, waiting 2 ns")
                 await Timer(2, units="ns")

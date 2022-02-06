@@ -24,9 +24,7 @@ async def wait_2ns(_):
 
 
 # ## Starting tasks
-async def counter(
-    name, delay, count,
-):
+async def counter(name, delay, count):
     """Counts up to the count argument after delay"""
     for ii in range(1, count + 1):
         await Timer(delay, units="ns")
@@ -55,7 +53,7 @@ async def wait_for_it(_):
 # ### Running tasks in parallel
 @cocotb.test()
 async def counters(_):
-    """Test that forks two counters and waits for them"""
+    """Test that starts two counters and waits for them"""
     logger.info("The Count will count to five.")
     logger.info("Mom will count to three.")
     the_count = cocotb.start_soon(counter("The Count", 1, 5))
