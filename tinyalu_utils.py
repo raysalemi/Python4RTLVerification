@@ -40,7 +40,8 @@ logger.setLevel(logging.DEBUG)
 
 
 # ### Reading a signal value
-
+# Figure 6: get_int() converts a bus to an integer
+# turning a value of x or z to 0
 def get_int(signal):
     try:
         sig = int(signal.value)

@@ -1,3 +1,4 @@
+# Figure 3: Importing cocotb and tinyalu_utils resources
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, FallingEdge
@@ -16,6 +17,7 @@ async def no_count(dut):
     """Test no count if reset is 0"""
     cocotb.start_soon(Clock(dut.clk, 2, units="ns").start())
     dut.reset_n.value = 0
+# Figure 5: Wait for five clocks and check the output
     await ClockCycles(dut.clk, 5)
     count = get_int(dut.count.value)
     logger.info(f"After 5 clocks count is {count}")
@@ -23,6 +25,7 @@ async def no_count(dut):
 
 
 # ## Checking that the counter counts
+# Figure 7: Testing that the counter counts
 @cocotb.test()
 async def three_count(dut):
     """Test that we count up as expected"""
@@ -38,6 +41,8 @@ async def three_count(dut):
 
 # ## A common coroutine mistake
 
+# Figure 8: Forgetting the await statement
+# is a common mistake
 @cocotb.test()
 async def oops(dut):
     """Demonstrate a coroutine mistake"""
