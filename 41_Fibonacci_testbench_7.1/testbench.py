@@ -1,4 +1,5 @@
 from pyuvm import *
+import pyuvm
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 import sys
@@ -10,12 +11,15 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 # # Fibonacci testbench: 7.1
 
 # ## FibonacciSeq
+
+# Figure 1: Setting up the Fibonacci pattern
 class FibonacciSeq(uvm_sequence):
     async def body(self):
         prev_num = 0
         cur_num = 1
         fib_list = [prev_num, cur_num]
         cmd = AluSeqItem("cmd", None, None, Ops.ADD)
+        # Figure 2: Generating Fibonacci numbers
         for _ in range(7):
             await self.start_item(cmd)
             cmd.A = prev_num
@@ -24,16 +28,21 @@ class FibonacciSeq(uvm_sequence):
             fib_list.append(cmd.result)
             prev_num = cur_num
             cur_num = cmd.result
+        # Figure 3: Logging messages from a sequence
         uvm_root().logger.info("Fibonacci Sequence: " + str(fib_list))
 
 
 # ## Driver
+
+# Figure 4: Adding an analysis port to the Driver
 class Driver(uvm_driver):
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
 
     def start_of_simulation_phase(self):
         self.bfm = TinyAluBfm()
+
+    #  Figure 5: The run phase gets a result back from the BFM
 
     async def run_phase(self):
         await self.bfm.reset()
@@ -42,6 +51,7 @@ class Driver(uvm_driver):
             cmd = await self.seq_item_port.get_next_item()
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
             result = await self.bfm.get_result()
+            # Figure 6: Writing the result into the sequence item
             self.ap.write(result)
             cmd.result = result
             self.seq_item_port.item_done()
@@ -51,6 +61,7 @@ class Driver(uvm_driver):
 class AluEnv(uvm_env):
 
     # ## Connecting the driver to the sequencer
+    # Figure 8: AluEnv environment without a result monitor
     def build_phase(self):
         self.seqr = uvm_sequencer("seqr", self)
         ConfigDB().set(None, "*", "SEQR", self.seqr)
@@ -59,8 +70,10 @@ class AluEnv(uvm_env):
         self.scoreboard = Scoreboard("scoreboard", self)
         self.coverage = Coverage("coverage", self)
 
+    # Figure 9: Connecting the Driver analysis port
     def connect_phase(self):
-        self.driver.seq_item_port.connect(self.seqr.seq_item_export)
+        self.driver.seq_item_port.connect(
+            self.seqr.seq_item_export)
         self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
         self.cmd_mon.ap.connect(self.coverage.analysis_export)
         self.driver.ap.connect(self.scoreboard.result_export)
@@ -157,6 +170,7 @@ class Monitor(uvm_component):
             self.ap.write(datum)
 
 
+@pyuvm.test()
 class FibonacciTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv("env", self)
@@ -173,6 +187,3 @@ class FibonacciTest(uvm_test):
         self.drop_objection()
 
 
-@cocotb.test()
-async def fibonaaci_test(dut):
-    await uvm_root().run_test(FibonacciTest)

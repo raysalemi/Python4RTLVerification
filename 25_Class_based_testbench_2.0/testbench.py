@@ -9,6 +9,7 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction, logger  # noqa: E402
 
 
 # ## The BaseTester class
+# Figure 2: Common behavior across all tests
 class BaseTester():
 
     async def execute(self):
@@ -24,20 +25,22 @@ class BaseTester():
 
 
 # ### The RandomTester
+# Figure 3: RandomTester overrides get_operands()
 class RandomTester(BaseTester):
     def get_operands(self):
         return random.randint(0, 255), random.randint(0, 255)
 
 
 # ### The MaxTester
+# Figure 4: MaxTester overrides get_operands()
 class MaxTester(BaseTester):
-
     def get_operands(self):
         return 0xFF, 0xFF
 
 
 # ## The Scoreboard class
 # ### Initialize the scoreboard
+# Figure 5: Initializing the Scoreboard
 class Scoreboard():
     def __init__(self):
         self.bfm = TinyAluBfm()
@@ -46,11 +49,14 @@ class Scoreboard():
         self.cvg = set()
 
 # ### Define the data gathering tasks
+# Figure 6: The Scoreboard gets a command
+
     async def get_cmds(self):
         while True:
             cmd = await self.bfm.get_cmd()
             self.cmds.append(cmd)
 
+# Figure 7: The Scoreboard gets a result
     async def get_results(self):
         while True:
             result = await self.bfm.get_result()
@@ -58,11 +64,13 @@ class Scoreboard():
 
 # ### The Scoreboard's start_tasks() function
 
+# Figure 8: The scoreboard launches data-gathering tasks
     def start_tasks(self):
         cocotb.start_soon(self.get_cmds())
         cocotb.start_soon(self.get_results())
 
 # ### The Scoreboard's check_results() function
+# Figure 9: The check_results() phase
     def check_results(self):
         passed = True
         for cmd in self.cmds:
@@ -80,6 +88,7 @@ class Scoreboard():
                     f"FAILED: {aa:02x} {op.name} {bb:02x} = {actual:04x}"
                     f" - predicted {prediction:04x}")
 
+# Figure 10: The Scoreboard checks functional coverage
         if len(set(Ops) - self.cvg) > 0:
             logger.error(
                 f"Functional coverage error. Missed: {set(Ops)-self.cvg}")
@@ -90,13 +99,14 @@ class Scoreboard():
 
 
 # ## The execute_test() coroutine
-
+# Figure 11: The execute_test coroutine runs the test
 async def execute_test(tester_class):
     bfm = TinyAluBfm()
     scoreboard = Scoreboard()
     await bfm.reset()
     bfm.start_tasks()
     scoreboard.start_tasks()
+# Figure 12: Execute the tester
     tester = tester_class()
     await tester.execute()
     passed = scoreboard.check_results()
@@ -104,7 +114,7 @@ async def execute_test(tester_class):
 
 
 # ## The cocotb tests
-
+# Figure 13: cocotb will launch the execute_test coroutine
 @cocotb.test()
 async def random_test(_):
     """Random operands"""

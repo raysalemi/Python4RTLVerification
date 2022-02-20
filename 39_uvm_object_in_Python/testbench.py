@@ -11,6 +11,8 @@ from tinyalu_utils import logger  # noqa: E402
 
 # ## Creating a string from an object
 # ## Comparing objects
+
+# Figure 2: Extending uvm_object
 class PersonRecord(uvm_object):
     def __init__(self, name="", id_number=None):
         super().__init__(name)
@@ -19,14 +21,17 @@ class PersonRecord(uvm_object):
     def __str__(self):
         return f"Name: {self.get_name()}, ID: {self.id_number}"
 
+    # Figure 6: Comparing pyuvm uvm_objects using __eq__()
     def __eq__(self, other):
         return self.id_number == other.id_number
 
+    # Figure 15: Overriding do_copy()
     def do_copy(self, other):
         super().do_copy(other)
         self.id_number = other.id_number
 
 
+# Figure 3: Printing a uvm_object
 @cocotb.test()
 async def test_str(_):
     xx = PersonRecord("Joe Shmoe", 37)
@@ -34,6 +39,7 @@ async def test_str(_):
     logger.info("Logging the record: " + str(xx))
 
 
+# Figure 7: Comparing uvm_objects using ==
 @cocotb.test()
 async def test_eq(_):
     batman = PersonRecord("Batman", 27)
@@ -45,21 +51,27 @@ async def test_eq(_):
 
 
 # ## Copying and cloning
+
+# Figure 8: Extending PersonRecord and leveraging __str__()
 class StudentRecord(PersonRecord):
     def __init__(self, name="", id_number=None, grades=[]):
         super().__init__(name, id_number)
         self.grades = grades
 
+    # Figure 11: Using super() to leverage the PersonRecord __str__() method
     def __str__(self):
         return super().__str__() + f" Grades: {self.grades}"
 
-# ### do_copy()
+    # ### do_copy()
+    # Figure 16: Using super() in do_copy to do a deep copy correctly
     def do_copy(self, other):
         super().do_copy(other)
         self.grades = list(other.grades)
 
 
 # ### Copying with Python
+
+# Figure 9: Copying an object with copy.copy()
 @cocotb.test()
 async def copy_copy_test(_):
     mary = StudentRecord("Mary", 33, [97, 82])
@@ -72,6 +84,7 @@ async def copy_copy_test(_):
     print("id(mary_copy.grades):", id(mary_copy.grades))
 
 
+# Figure 10: Making copies of all objects with copy.deepcopy()
 @cocotb.test()
 async def copy_deepcopy_test(_):
     mary = StudentRecord("Mary", 33, [97, 82])
@@ -85,6 +98,8 @@ async def copy_deepcopy_test(_):
 
 
 # ## Copying with the UVM
+
+# Figure 12: Using the copy() method in uvm_object
 @cocotb.test()
 async def copy_test(_):
     mary = StudentRecord("Mary", 33, [97, 82])
@@ -97,6 +112,7 @@ async def copy_test(_):
     print("id(mary_copy.grades):", id(mary_copy.grades))
 
 
+# Figure 13: Using the clone() method in uvm_object
 @cocotb.test()
 async def clone_test(_):
     mary = StudentRecord("Mary", 33, [97, 82])

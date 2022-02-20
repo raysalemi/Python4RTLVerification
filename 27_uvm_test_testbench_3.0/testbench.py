@@ -1,4 +1,5 @@
 import cocotb
+import pyuvm
 from pyuvm import *
 import random
 from pathlib import Path
@@ -85,6 +86,8 @@ class Scoreboard():
 # # uvm_test testbench 3.0
 # ## The HelloWorldTest class
 
+# Figure 1: The basic pyuvm use model in HelloWorldTest
+@pyuvm.test()
 class HelloWorldTest(uvm_test):
     async def run_phase(self):
         self.raise_objection()
@@ -92,15 +95,8 @@ class HelloWorldTest(uvm_test):
         self.drop_objection()
 
 
-# ### Running the `HelloWorldTest`
-
-@cocotb.test()
-async def hello_world(_):
-    await uvm_root().run_test(HelloWorldTest)
-
-
+# Figure 5: BaseTest is an abstract class with no build_phase()
 class BaseTest(uvm_test):
-
     async def run_phase(self):
         self.raise_objection()
         bfm = TinyAluBfm()
@@ -114,25 +110,16 @@ class BaseTest(uvm_test):
         self.drop_objection()
 
 
+# Figure 6: Extending BaseTest to create tests
+@pyuvm.test()
 class RandomTest(BaseTest):
     """Run with random operations"""
     def build_phase(self):
         self.tester = RandomTester()
 
 
+@pyuvm.test()
 class MaxTest(BaseTest):
     """Run with random operations"""
     def build_phase(self):
         self.tester = MaxTester()
-
-
-@cocotb.test()
-async def random_test(_):
-    """Random operands"""
-    await uvm_root().run_test(RandomTest)
-
-
-@cocotb.test()
-async def max_test(_):
-    """Maximum operands"""
-    await uvm_root().run_test(MaxTest)

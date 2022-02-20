@@ -1,9 +1,10 @@
-import cocotb
+import pyuvm
 from pyuvm import *
 
 
 #  ## The ConfigDB().get method
 
+# Figure 1: Logging a message we get from the ConfigDB
 class MsgLogger(uvm_component):
 
     async def run_phase(self):
@@ -15,12 +16,15 @@ class MsgLogger(uvm_component):
 
 # ## The ConfigDB().set() method
 
+# Figure 2: Instantiating two loggers in the environment
 class MsgEnv(uvm_env):
     def build_phase(self):
         self.loga = MsgLogger("loga", self)
         self.logb = MsgLogger("logb", self)
 
 
+# Figure 3: Giving loga and logb different messages
+@pyuvm.test()
 class MsgTest(uvm_test):
 
     def build_phase(self):
@@ -29,12 +33,9 @@ class MsgTest(uvm_test):
         ConfigDB().set(self, "env.logb", "MSG", "LOG B msg")
 
 
-@cocotb.test()
-async def log_msgs(dut):
-    await uvm_root().run_test(MsgTest)
-
-
 # ## Wildcards
+# Figure 5: Adding talka and talkb to the environment
+
 class MultiMsgEnv(MsgEnv):
     def build_phase(self):
         self.talka = MsgLogger("talka", self)
@@ -42,6 +43,8 @@ class MultiMsgEnv(MsgEnv):
         super().build_phase()
 
 
+# Figure 6: Using a wildcard to store a message
+@pyuvm.test()
 class MultiMsgTest(uvm_test):
     def build_phase(self):
         self.env = MultiMsgEnv("env", self)
@@ -50,18 +53,16 @@ class MultiMsgTest(uvm_test):
         ConfigDB().set(self, "env.t*", "MSG", "TALK TALK")
 
 
-@cocotb.test()
-async def multi_msg(_):
-    await uvm_root().run_test(MultiMsgTest)
-
-
 # ## Global data
+# Figure 9: Adding the gtalk component to the environment
 class GlobalEnv(MultiMsgEnv):
     def build_phase(self):
         self.gtalk = MsgLogger("gtalk", self)
         super().build_phase()
 
 
+# Figure 10: Storing a global message
+@pyuvm.test()
 class GlobalTest(uvm_test):
     def build_phase(self):
         self.env = GlobalEnv("env", self)
@@ -71,24 +72,18 @@ class GlobalTest(uvm_test):
         ConfigDB().set(None, "*", "MSG", "GLOBAL")
 
 
-@cocotb.test()
-async def global_msg(_):
-    await uvm_root().run_test(GlobalTest)
-
-
 # ## Parent/child conflict
+
+# Figure 12: Creating a ConfigDB conflict between
+# parent and child at env.loga.  Which message prints?
 class ConflictEnv(uvm_env):
     def build_phase(self):
         self.loga = MsgLogger("loga", self)
         ConfigDB().set(self, "loga", "MSG", "CHILD RULES!")
 
 
+@pyuvm.test()
 class ConflictTest(uvm_test):
     def build_phase(self):
         self.env = ConflictEnv("env", self)
         ConfigDB().set(self, "env.loga", "MSG", "PARENT RULES!")
-
-
-@cocotb.test()
-async def conflict_test(_):
-    await uvm_root().run_test(ConflictTest)

@@ -9,10 +9,11 @@ import sys
 sys.path.insert(0, str(Path("..").resolve()))
 from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
-
 # # Testbench components
 # ## The testers
 
+
+# Figure 2: The BaseTester using TLM 1.0
 class BaseTester(uvm_component):
 
     def build_phase(self):
@@ -35,6 +36,8 @@ class BaseTester(uvm_component):
 
 
 # ### RandomTester and MaxTester
+# Figure 3: The RandomTester and MaxTester
+# override get_operands() to do their jobs
 class RandomTester(BaseTester):
     def get_operands(self):
         return random.randint(0, 255), random.randint(0, 255)
@@ -46,6 +49,8 @@ class MaxTester(BaseTester):
 
 
 # ## Driver
+# Figure 4: The Driver class takes commands and sends them
+# to the TinyALU using the BFM.
 class Driver(uvm_driver):
 
     def build_phase(self):
@@ -61,15 +66,22 @@ class Driver(uvm_driver):
 
 
 # ## Monitor
+# Figure 6: The Monitor() class takes the method name
+# as an instantiation argument
 class Monitor(uvm_monitor):
     def __init__(self, name, parent, method_name):
         super().__init__(name, parent)
         self.method_name = method_name
 
+# Figure 7: Getting the monitor method from the BFM
+
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
         self.bfm = TinyAluBfm()
         self.get_method = getattr(self.bfm, self.method_name)
+
+# Figure 8: Getting the datum and writing it
+# it to the analysis port
 
     async def run_phase(self):
         while True:
@@ -78,6 +90,7 @@ class Monitor(uvm_monitor):
 
 
 # ## Coverage
+# Figure 9: Extending uvm_analysis_export directly
 class Coverage(uvm_analysis_export):
     def start_of_simulation_phase(self):
         self.cvg = set()
@@ -96,20 +109,28 @@ class Coverage(uvm_analysis_export):
 
 
 # ## Scoreboard
+# Figure 10: Using uvm_tlm_analysis_fifo to provide
+# multiple analysis_exports
+# and creating ports to read the fifos
 class Scoreboard(uvm_component):
 
     def build_phase(self):
+        # Figure 5: Instantiating Monitor() and passing different
+        # function names to get different data
         self.cmd_mon_fifo = uvm_tlm_analysis_fifo("cmd_mon_fifo", self)
         self.result_mon_fifo = uvm_tlm_analysis_fifo("result_mon_fifo", self)
         self.cmd_gp = uvm_get_port("cmd_gp", self)
         self.result_gp = uvm_get_port("result_gp", self)
 
+# Figure 11: Connecting get ports to the FIFOS and
+# making the FIFO analysis exports visible to the user
     def connect_phase(self):
         self.cmd_gp.connect(self.cmd_mon_fifo.get_export)
         self.result_gp.connect(self.result_mon_fifo.get_export)
         self.cmd_export = self.cmd_mon_fifo.analysis_export
         self.result_export = self.result_mon_fifo.analysis_export
 
+# Figure 12: Check results after the run phas
     def check_phase(self):
         passed = True
         while True:
@@ -130,49 +151,3 @@ class Scoreboard(uvm_component):
                     f"FAILED: {aa:02x} {Ops(op).name} {bb:02x} ="
                     f" {actual:04x} - predicted {prediction:04x}")
         assert passed
-
-
-class AluEnv(uvm_env):
-
-    # ### AluEnv.build_phase()
-    def build_phase(self):
-        self.tester = BaseTester.create("tester", self)
-        self.driver = Driver("driver", self)
-        self.cmd_fifo = uvm_tlm_fifo("cmd_fifo", self)
-        self.scoreboard = Scoreboard("scoreboard", self)
-        self.coverage = Coverage("coverage", self)
-        self.cmd_mon = Monitor("cmd_monitor", self, "get_cmd")
-        self.result_mon = Monitor("result_monitor", self, "get_result")
-
-    # ### AluEnv.connect_phase()
-    def connect_phase(self):
-        self.tester.pp.connect(self.cmd_fifo.put_export)
-        self.driver.gp.connect(self.cmd_fifo.get_export)
-
-        self.cmd_mon.ap.connect(self.coverage)
-        self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
-
-        self.result_mon.ap.connect(self.scoreboard.result_export)
-
-
-# ## `RandomTest` and `MaxTest`
-class RandomTest(uvm_test):
-    def build_phase(self):
-        uvm_factory().set_type_override_by_type(BaseTester, RandomTester)
-        self.env = AluEnv("env", self)
-
-
-class MaxTest(uvm_test):
-    def build_phase(self):
-        uvm_factory().set_type_override_by_type(BaseTester, MaxTester)
-        self.env = AluEnv("env", self)
-
-
-@cocotb.test()
-async def random_test(_):
-    await uvm_root().run_test(RandomTest)
-
-
-@cocotb.test()
-async def max_test(_):
-    await uvm_root().run_test(MaxTest)

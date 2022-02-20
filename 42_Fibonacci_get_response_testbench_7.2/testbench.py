@@ -1,4 +1,5 @@
 from pyuvm import *
+import pyuvm
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 import sys
@@ -9,6 +10,9 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 # # Fibonacci using `get_response()` testbench: 7.2
 # ## AluResultItem
+
+# Figure 1: A sequence item that stores a result
+
 class AluResultItem(uvm_sequence_item):
     def __init__(self, name, result):
         super().__init__(name)
@@ -20,6 +24,7 @@ class AluResultItem(uvm_sequence_item):
 
 # ## Driver
 
+# Figure 2: The driver getting the result from the monitor
 class Driver(uvm_driver):
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
@@ -35,11 +40,13 @@ class Driver(uvm_driver):
             await self.bfm.send_op(cmd.A, cmd.B, cmd.op)
             result = await self.bfm.get_result()
             self.ap.write(result)
+            # Figure 3: Sending the result item back
             result_item = AluResultItem("result_item", result)
             result_item.set_id_info(cmd)
             self.seq_item_port.item_done(result_item)
 
 
+# Figure 4: Sending commands to the TinyALU
 class FibonacciSeq(uvm_sequence):
     async def body(self):
         prev_num = 0
@@ -51,6 +58,7 @@ class FibonacciSeq(uvm_sequence):
             cmd.A = prev_num
             cmd.B = cur_num
             await self.finish_item(cmd)
+            # Figure 5: Calling get_response() to get the response
             rsp = await self.get_response()
             fib_list.append(rsp.result)
             prev_num = cur_num
@@ -167,6 +175,7 @@ class Monitor(uvm_component):
             self.ap.write(datum)
 
 
+@pyuvm.test()
 class FibonacciTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv("env", self)
@@ -182,8 +191,3 @@ class FibonacciTest(uvm_test):
         seq = FibonacciSeq.create("seq")
         await seq.start(self.seqr)
         self.drop_objection()
-
-
-@cocotb.test()
-async def fibonaaci_test(dut):
-    await uvm_root().run_test(FibonacciTest)

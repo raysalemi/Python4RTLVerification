@@ -1,4 +1,5 @@
 import cocotb
+import pyuvm
 from pyuvm import *
 import random
 from pathlib import Path
@@ -11,6 +12,7 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 # # UVM Factory testbench 5.0
 # ### BaseTester
+# Figure 2: Abstract base class raises an error if instantiated
 class BaseTester(uvm_component):
 
     def get_operands(self):
@@ -89,6 +91,7 @@ class Scoreboard(uvm_component):
 
 
 # ## AluEnv
+# Figure 1: Using the factory to instantiate the BaseTester
 class AluEnv(uvm_env):
     """Instantiate the scoreboard"""
 
@@ -101,6 +104,8 @@ class AluEnv(uvm_env):
 
 
 # ## RandomTest
+# Figure 3: Overriding BaseTester with RandomTester
+@pyuvm.test()
 class RandomTest(uvm_test):
     """Run with random operands"""
     def build_phase(self):
@@ -109,20 +114,10 @@ class RandomTest(uvm_test):
 
 
 # ## MaxTest
+# Figure 4: Overriding BaseTester with MaxTester
+@pyuvm.test()
 class MaxTest(uvm_test):
     """Run with max operands"""
     def build_phase(self):
         uvm_factory().set_type_override_by_type(BaseTester, MaxTester)
         self.env = AluEnv("env", self)
-
-
-@cocotb.test()
-async def random_test(dut):
-    """Random operands"""
-    await uvm_root().run_test(RandomTest)
-
-
-@cocotb.test()
-async def max_test(dut):
-    """Maximum operands"""
-    await uvm_root().run_test(MaxTest)

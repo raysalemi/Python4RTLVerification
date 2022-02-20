@@ -1,4 +1,5 @@
 import cocotb
+import pyuvm
 from pyuvm import *
 import random
 from pathlib import Path
@@ -11,6 +12,8 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 # ## Converting the testers to UVM components
 # ### BaseTester
+# Figure 2: The BaseTester implements phases common
+# to all testers
 class BaseTester(uvm_component):
 
     def start_of_simulation_phase(self):
@@ -42,6 +45,7 @@ class MaxTester(BaseTester):
 
 
 # ### Scoreboard
+# Figure 4: Defining the Scoreboard data-gathering coroutines
 class Scoreboard(uvm_component):
 
     async def get_cmds(self):
@@ -54,6 +58,8 @@ class Scoreboard(uvm_component):
             result = await self.bfm.get_result()
             self.results.append(result)
 
+# Figure 5: Using the start_of_simulation_phase() to launch
+# the monitoring tasks
     def start_of_simulation_phase(self):
         self.bfm = TinyAluBfm()
         self.cmds = []
@@ -62,6 +68,7 @@ class Scoreboard(uvm_component):
         cocotb.start_soon(self.get_cmds())
         cocotb.start_soon(self.get_results())
 
+# Figure 6: Checking results after the run_phase() completes
     def check_phase(self):
         passed = True
         for cmd in self.cmds:
@@ -89,6 +96,7 @@ class Scoreboard(uvm_component):
 
 
 # ## Using an environment
+# Figure 8: All environments need the scoreboard
 class BaseEnv(uvm_env):
     """Instantiate the scoreboard"""
 
@@ -96,6 +104,8 @@ class BaseEnv(uvm_env):
         self.scoreboard = Scoreboard("scoreboard", self)
 
 
+# Figure 9: The RandomEnv instantiates the RandomTester
+# The MaxEnv instantiates the MaxTester
 class RandomEnv(BaseEnv):
     """Generate random operands"""
 
@@ -113,25 +123,17 @@ class MaxEnv(BaseEnv):
 
 
 # ## Creating RandomTest and MaxTest
+
+# Figure 10: Instantiating the right environment in each test
+@pyuvm.test()
 class RandomTest(uvm_test):
     """Run with random operands"""
     def build_phase(self):
         self.env = RandomEnv("env", self)
 
 
+@pyuvm.test()
 class MaxTest(uvm_test):
     """Run with max operands"""
     def build_phase(self):
         self.env = MaxEnv("env", self)
-
-
-@cocotb.test()
-async def random_test(dut):
-    """Random operands"""
-    await uvm_root().run_test(RandomTest)
-
-
-@cocotb.test()
-async def max_test(dut):
-    """Maximum operands"""
-    await uvm_root().run_test(MaxTest)

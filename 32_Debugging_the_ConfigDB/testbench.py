@@ -1,4 +1,4 @@
-import cocotb
+import pyuvm
 from pyuvm import *
 
 
@@ -16,12 +16,16 @@ class MsgLogger(uvm_component):
 
 # ## The ConfigDB().set() method
 
+# Figure 1: Instantiate two loggers
+
 class MsgEnv(uvm_env):
     def build_phase(self):
         self.loga = MsgLogger("loga", self)
         self.logb = MsgLogger("logb", self)
 
 
+# Figure 2: Provide a message for only one logger
+@pyuvm.test(expect_error=UVMConfigItemNotFound)
 class MsgTest(uvm_test):
 
     def build_phase(self):
@@ -29,12 +33,9 @@ class MsgTest(uvm_test):
         ConfigDB().set(self, "env.loga", "MSG", "LOG A msg")
 
 
-@cocotb.test(expect_error=UVMConfigItemNotFound)
-async def log_msgs(_):
-    await uvm_root().run_test(MsgTest)
-
-
 # ## Catching Exceptions
+# Figure 3: Misspelling a ConfigDB() key
+@pyuvm.test(expect_error=UVMConfigItemNotFound)
 class MsgTestAlmostFixed(uvm_test):
 
     def build_phase(self):
@@ -43,11 +44,7 @@ class MsgTestAlmostFixed(uvm_test):
         ConfigDB().set(self, "env.logb", "MESG", "LOG B msg")
 
 
-@cocotb.test(expect_error=UVMConfigItemNotFound)
-async def log_msgs_almost(_):
-    await uvm_root().run_test(MsgTestAlmostFixed)
-
-
+# Figure 4: Catching ConfigDB()exceptions
 class NiceMsgLogger(uvm_component):
 
     async def run_phase(self):
@@ -68,6 +65,9 @@ class NiceMsgEnv(uvm_env):
 
 
 # ## Printing the ConfigDB
+
+# Figure 6: Printing the ConfigDB()
+@pyuvm.test()
 class NiceMsgTest(uvm_test):
 
     def build_phase(self):
@@ -78,11 +78,8 @@ class NiceMsgTest(uvm_test):
         print(ConfigDB())
 
 
-@cocotb.test()
-async def nice_log_msgs(_):
-    await uvm_root().run_test(NiceMsgTest)
-
-
+# Figure 7: Debugging a ConfigDB() error using print()
+@pyuvm.test()
 class NiceMsgTestAlmostFixed(uvm_test):
 
     def build_phase(self):
@@ -94,11 +91,7 @@ class NiceMsgTestAlmostFixed(uvm_test):
         print(ConfigDB())
 
 
-@cocotb.test()
-async def nice_log_msgs_almost(_):
-    await uvm_root().run_test(NiceMsgTestAlmostFixed)
 # ## Wildcards
-
 
 class MultiMsgEnv(MsgEnv):
     def build_phase(self):
@@ -107,17 +100,13 @@ class MultiMsgEnv(MsgEnv):
         super().build_phase()
 
 
+@pyuvm.test()
 class MultiMsgTest(uvm_test):
     def build_phase(self):
         self.env = MultiMsgEnv("env", self)
         ConfigDB().set(self, "env.loga", "MSG", "LOG A msg")
         ConfigDB().set(self, "env.logb", "MSG", "LOG B msg")
         ConfigDB().set(self, "env.t*", "MSG", "TALK TALK")
-
-
-@cocotb.test()
-async def multi_msg(_):
-    await uvm_root().run_test(MultiMsgTest)
 
 
 # ## Debugging Parent/child conflict
@@ -127,6 +116,8 @@ class ConflictEnv(uvm_env):
         ConfigDB().set(self, "loga", "MSG", "CHILD RULES!")
 
 
+# Figure 8: Both parent and child reference env.loga
+@pyuvm.test()
 class ConflictTest(uvm_test):
     def build_phase(self):
         self.env = ConflictEnv("env", self)
@@ -136,11 +127,6 @@ class ConflictTest(uvm_test):
         print(ConfigDB())
 
 
-@cocotb.test()
-async def conflict_test(_):
-    await uvm_root().run_test(ConflictTest)
-
-
 # ## Tracing ConfigDB() Operations
 class GlobalEnv(MultiMsgEnv):
     def build_phase(self):
@@ -148,6 +134,8 @@ class GlobalEnv(MultiMsgEnv):
         super().build_phase()
 
 
+# Figure 10: Tracing ConfigDB() operations using is_tracing
+@pyuvm.test()
 class GlobalTest(uvm_test):
     def build_phase(self):
         ConfigDB().is_tracing = True
@@ -156,8 +144,3 @@ class GlobalTest(uvm_test):
         ConfigDB().set(self, "env.logb", "MSG", "LOG B msg")
         ConfigDB().set(self, "env.t*", "MSG", "TALK TALK")
         ConfigDB().set(None, "*", "MSG", "GLOBAL")
-
-
-@cocotb.test()
-async def global_msg(_):
-    await uvm_root().run_test(GlobalTest)

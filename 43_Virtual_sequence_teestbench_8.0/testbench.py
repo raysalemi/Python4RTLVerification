@@ -2,6 +2,7 @@ from cocotb.triggers import Combine
 from pyuvm import *
 import random
 import cocotb
+import pyuvm
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
 import sys
@@ -12,6 +13,8 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 
 # # Virtual sequence testbench: 8.0
 # ## Launching sequences from a virtual sequence
+# Figure 1: Calling a virtual sequence
+@pyuvm.test()
 class AluTest(uvm_test):
     def build_phase(self):
         self.env = AluEnv("env", self)
@@ -25,6 +28,7 @@ class AluTest(uvm_test):
         self.drop_objection()
 
 
+# Figure 2: A virtual sequence starts other sequences
 class TestAllSeq(uvm_sequence):
 
     async def body(self):
@@ -35,6 +39,7 @@ class TestAllSeq(uvm_sequence):
         await max_seq.start(seqr)
 
 
+# Figure 4: Running RandomSeq and MaxSeq in parallel
 class TestAllParallelSeq(uvm_sequence):
 
     async def body(self):
@@ -48,6 +53,7 @@ class TestAllParallelSeq(uvm_sequence):
 
 # ## Creating a programming interface
 # ### OpSeq
+# Figure 6: A sequence that can run any operation
 class OpSeq(uvm_sequence):
     def __init__(self, name, aa, bb, op):
         super().__init__(name)
@@ -64,6 +70,7 @@ class OpSeq(uvm_sequence):
 
 
 # ### TinyALU programming interface
+# Figure 7: The programming interface coroutines
 async def do_add(seqr, aa, bb):
     seq = OpSeq("seq", aa, bb, Ops.ADD)
     await seq.start(seqr)
@@ -88,6 +95,8 @@ async def do_mul(seqr, aa, bb):
     return seq.result
 
 
+# Figure 8: The Fibonacci program written using
+# the programming interface
 class FibonacciSeq(uvm_sequence):
     def __init__(self, name):
         super().__init__(name)
@@ -260,6 +269,7 @@ class AluEnv(uvm_env):
         self.driver.ap.connect(self.scoreboard.result_export)
 
 
+@pyuvm.test()
 class ParallelTest(AluTest):
     def end_of_elaboration_phase(self):
         uvm_factory().set_type_override_by_type(
@@ -267,29 +277,10 @@ class ParallelTest(AluTest):
         return super().end_of_elaboration_phase()
 
 
+@pyuvm.test()
 class FibonacciTest(AluTest):
     def end_of_elaboration_phase(self):
         ConfigDB().set(None, "*", "DISABLE_COVERAGE_ERRORS", True)
         self.env.set_logging_level_hier(CRITICAL)
         uvm_factory().set_type_override_by_type(TestAllSeq, FibonacciSeq)
         return super().end_of_elaboration_phase()
-
-
-@cocotb.test()
-async def alu_test(dut):
-    """Test ALU with random and max values"""
-    uvm_root().set_logging_level_hier(INFO)
-    await uvm_root().run_test("AluTest")
-
-
-@cocotb.test()
-async def parallel_alu_test(dut):
-    """Test ALU random and max forked"""
-    uvm_root().set_logging_level_hier(INFO)
-    await uvm_root().run_test("ParallelTest")
-
-
-@cocotb.test()
-async def fibonacci_sim(dut):
-    """Run Fibonacci program"""
-    await uvm_root().run_test("FibonacciTest")

@@ -1,4 +1,4 @@
-import cocotb
+import pyuvm
 from pyuvm import *
 import random
 import statistics
@@ -7,6 +7,7 @@ import statistics
 
 # # Analysis ports
 # ## The uvm_analysis_port
+# Figure 1: A random number generator
 class NumberGenerator(uvm_component):
     def build_phase(self):
         self.ap = uvm_analysis_port("ap", self)
@@ -22,6 +23,7 @@ class NumberGenerator(uvm_component):
 
 
 # ## Extending the uvm_analysis_export class
+# Figure 2: A component to add random numbers
 class Adder(uvm_analysis_export):
     def start_of_simulation_phase(self):
         self.sum = 0
@@ -33,6 +35,9 @@ class Adder(uvm_analysis_export):
         self.logger.info(f"Sum: {self.sum}")
 
 
+# Figure 3: Connecting a uvm_analysis_export to
+# a uvm_analysis_port
+@pyuvm.test()
 class AdderTest(uvm_test):
     def build_phase(self):
         self.num_gen = NumberGenerator("num_gen", self)
@@ -42,13 +47,8 @@ class AdderTest(uvm_test):
         self.num_gen.ap.connect(self.sum)
 
 
-@cocotb.test()
-async def add_test(_):
-    """Testing the adder export"""
-    await uvm_root().run_test("AdderTest")
-
-
 # ## Instantiate a uvm_tlm_analysis_fifo
+# Figure 5: A component that averages random numbers
 class Average(uvm_component):
     def build_phase(self):
         self.fifo = uvm_tlm_analysis_fifo("fifo", self)
@@ -69,6 +69,8 @@ class Average(uvm_component):
         self.logger.info(f"Average: {sum/count:0.2f}")
 
 
+# Figure 6: A test that adds and averages random numbers
+@pyuvm.test()
 class AverageTest(uvm_test):
     def build_phase(self):
         self.num_gen = NumberGenerator("num_gen", self)
@@ -80,13 +82,8 @@ class AverageTest(uvm_test):
         self.num_gen.ap.connect(self.avg.fifo.analysis_export)
 
 
-@cocotb.test()
-async def avg_test(_):
-    """Test the Average"""
-    await uvm_root().run_test("AverageTest")
-
-
 # ## Extend the uvm_subscriber class
+# Figure 7: Using the statistics package to find the median
 class Median(uvm_subscriber):
 
     def start_of_simulation_phase(self):
@@ -99,6 +96,8 @@ class Median(uvm_subscriber):
         self.logger.info(f"Median: {statistics.median(self.numb_list)}")
 
 
+# Figure 8: A test that provides the sum, average, and median
+@pyuvm.test()
 class MedianTest(uvm_test):
     def build_phase(self):
         self.num_gen = NumberGenerator("num_gen", self)
@@ -110,9 +109,3 @@ class MedianTest(uvm_test):
         self.num_gen.ap.connect(self.sum)
         self.num_gen.ap.connect(self.avg.fifo.analysis_export)
         self.num_gen.ap.connect(self.median.analysis_export)
-
-
-@cocotb.test()
-async def median_test(_):
-    """Test the Median"""
-    await uvm_root().run_test("MedianTest")

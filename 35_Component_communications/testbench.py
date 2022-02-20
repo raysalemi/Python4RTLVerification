@@ -1,10 +1,11 @@
-import cocotb
+import pyuvm
 from cocotb.triggers import Timer
 from pyuvm import *
 
 
 # # Component communication
 # ## Ports
+# Figure 1: A producer that blocks on a full FIFO
 class BlockingProducer(uvm_component):
     def build_phase(self):
         self.bpp = uvm_blocking_put_port("bpp", self)
@@ -17,6 +18,7 @@ class BlockingProducer(uvm_component):
         self.drop_objection()
 
 
+# Figure 2: A consumer that blocks on an empty FIFO
 class BlockingConsumer(uvm_component):
     def build_phase(self):
         self.bgp = uvm_blocking_get_port("bgp", self)
@@ -28,6 +30,9 @@ class BlockingConsumer(uvm_component):
 
 
 # ## uvm_tlm_fifo
+# Figure 4: The connect_phase() in action
+
+@pyuvm.test()
 class BlockingTest(uvm_test):
     def build_phase(self):
         self.producer = BlockingProducer("producer", self)
@@ -39,13 +44,8 @@ class BlockingTest(uvm_test):
         self.consumer.bgp.connect(self.fifo.get_export)
 
 
-@cocotb.test()
-async def blocking_test(_):
-    """Demonstrate blocking"""
-    await uvm_root().run_test(BlockingTest)
-
-
 # ## Non-blocking communication in pyuvm
+# Figure 6: A producer that does not block on an full FIFO
 class NonBlockingProducer(uvm_component):
     def build_phase(self):
         self.nbpp = uvm_nonblocking_put_port("nbpp", self)
@@ -66,6 +66,7 @@ class NonBlockingProducer(uvm_component):
         self.drop_objection()
 
 
+# Figure 7: A consumer that does not block on an empty FIFO
 class NonBlockingConsumer(uvm_component):
     def build_phase(self):
         self.nbgp = uvm_nonblocking_get_port("nbgp", self)
@@ -82,6 +83,9 @@ class NonBlockingConsumer(uvm_component):
                     await Timer(3, units="ns")
 
 
+# Figure 8: Connecting the nonblocking components
+
+@pyuvm.test()
 class NonBlockingTest(uvm_test):
     def build_phase(self):
         self.producer = NonBlockingProducer("producer", self)
@@ -94,18 +98,8 @@ class NonBlockingTest(uvm_test):
 
 
 # ## Debugging uvm_tlm_fifo
+# Figure 11: Enabling log messages from uvm_tlm_fifo
+@pyuvm.test()
 class LoggedBlockingtest(BlockingTest):
     def end_of_elaboration_phase(self):
         self.fifo.set_logging_level_hier(FIFO_DEBUG)
-
-
-@cocotb.test()
-async def nonblocking_test(_):
-    """Demonstrate nonblocking"""
-    await uvm_root().run_test("NonBlockingTest")
-
-
-@cocotb.test()
-async def logged_blocking_test(_):
-    """Demonstrate logging"""
-    await uvm_root().run_test("LoggedBlockingtest")
