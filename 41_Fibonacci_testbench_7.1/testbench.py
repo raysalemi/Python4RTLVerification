@@ -185,5 +185,3 @@ class FibonacciTest(uvm_test):
         seq = FibonacciSeq.create("seq")
         await seq.start(self.seqr)
         self.drop_objection()
-
-
