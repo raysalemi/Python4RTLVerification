@@ -41,11 +41,12 @@ class AluEnv(uvm_env):
         # to the cmd_mon analysis port
         self.cmd_mon.ap.connect(self.coverage)
         self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
-
         self.result_mon.ap.connect(self.scoreboard.result_export)
 
 
 # ## `RandomTest` and `MaxTest`
+# Figure 7: RandomTest and MaxTest override the BaseTester
+
 @pyuvm.test()
 class RandomTest(uvm_test):
     def build_phase(self):

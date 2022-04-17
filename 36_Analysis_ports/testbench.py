@@ -41,14 +41,41 @@ class Adder(uvm_analysis_export):
 class AdderTest(uvm_test):
     def build_phase(self):
         self.num_gen = NumberGenerator("num_gen", self)
-        self.sum = Adder("sum", self)
+        self.sum_export = Adder("sum", self)
 
     def connect_phase(self):
-        self.num_gen.ap.connect(self.sum)
+        self.num_gen.ap.connect(self.sum_export)
+
+
+# ## Extend the uvm_subscriber class
+# Figure 5: Using the statistics package to find the median
+class Median(uvm_subscriber):
+
+    def start_of_simulation_phase(self):
+        self.numb_list = []
+
+    def write(self, nn):
+        self.numb_list.append(nn)
+
+    def report_phase(self):
+        self.logger.info(f"Median: {statistics.median(self.numb_list)}")
+
+
+# Figure 6: A test that provides the sum and median
+@pyuvm.test()
+class MedianTest(uvm_test):
+    def build_phase(self):
+        self.num_gen = NumberGenerator("num_gen", self)
+        self.sum_export = Adder("sum", self)
+        self.median = Median("median", self)
+
+    def connect_phase(self):
+        self.num_gen.ap.connect(self.sum_export)
+        self.num_gen.ap.connect(self.median.analysis_export)
 
 
 # ## Instantiate a uvm_tlm_analysis_fifo
-# Figure 5: A component that averages random numbers
+# Figure 7: A component that averages random numbers
 class Average(uvm_component):
     def build_phase(self):
         self.fifo = uvm_tlm_analysis_fifo("fifo", self)
@@ -56,6 +83,7 @@ class Average(uvm_component):
 
     def connect_phase(self):
         self.nbgp.connect(self.fifo.get_export)
+        self.analysis_export = self.fifo.analysis_export
 
     def report_phase(self):
         success = True
@@ -69,43 +97,16 @@ class Average(uvm_component):
         self.logger.info(f"Average: {sum/count:0.2f}")
 
 
-# Figure 6: A test that adds and averages random numbers
+# Figure 8: A test that reports sum, median, and avg
 @pyuvm.test()
 class AverageTest(uvm_test):
     def build_phase(self):
         self.num_gen = NumberGenerator("num_gen", self)
-        self.sum = Adder("sum", self)
-        self.avg = Average("avg", self)
-
-    def connect_phase(self):
-        self.num_gen.ap.connect(self.sum)
-        self.num_gen.ap.connect(self.avg.fifo.analysis_export)
-
-
-# ## Extend the uvm_subscriber class
-# Figure 7: Using the statistics package to find the median
-class Median(uvm_subscriber):
-
-    def start_of_simulation_phase(self):
-        self.numb_list = []
-
-    def write(self, nn):
-        self.numb_list.append(nn)
-
-    def report_phase(self):
-        self.logger.info(f"Median: {statistics.median(self.numb_list)}")
-
-
-# Figure 8: A test that provides the sum, average, and median
-@pyuvm.test()
-class MedianTest(uvm_test):
-    def build_phase(self):
-        self.num_gen = NumberGenerator("num_gen", self)
-        self.sum = Adder("sum", self)
-        self.avg = Average("avg", self)
+        self.sum_export = Adder("sum", self)
         self.median = Median("median", self)
+        self.avg = Average("avg", self)
 
     def connect_phase(self):
-        self.num_gen.ap.connect(self.sum)
-        self.num_gen.ap.connect(self.avg.fifo.analysis_export)
+        self.num_gen.ap.connect(self.sum_export)
         self.num_gen.ap.connect(self.median.analysis_export)
+        self.num_gen.ap.connect(self.avg.analysis_export)

@@ -42,10 +42,12 @@ class AluEnv(uvm_env):
 
     # Figure 5: Connecting the sequencer to the driver
     def connect_phase(self):
-        self.driver.seq_item_port.connect(self.seqr.seq_item_export)
+        self.driver.seq_item_port.connect(
+            self.seqr.seq_item_export)
         self.cmd_mon.ap.connect(self.scoreboard.cmd_export)
         self.cmd_mon.ap.connect(self.coverage.analysis_export)
-        self.result_mon.ap.connect(self.scoreboard.result_export)
+        self.result_mon.ap.connect(
+            self.scoreboard.result_export)
 
 
 # ## AluSeqItem

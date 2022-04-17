@@ -102,7 +102,7 @@ async def ConsumerNoWait(queue):
 # Figure 9: Running our nonblocking test
 @cocotb.test()
 async def producer_consumer_nowait(_):
-    """Show producer and consumer not waiting"""
+    """Show producer and consumer waiting"""
     queue = Queue(maxsize=1)
     cocotb.start_soon(ConsumerNoWait(queue))
     await ProducerNoWait(queue, 3)

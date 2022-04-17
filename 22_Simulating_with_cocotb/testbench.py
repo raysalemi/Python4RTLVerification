@@ -6,7 +6,8 @@ from pathlib import Path
 import sys
 # All testbenches use tinyalu_utils, so store it in a central
 # place and add its path to the sys path so we can import it
-sys.path.insert(0, str(Path("..").resolve()))
+parent_path = Path("..").resolve()
+sys.path.insert(0, str(parent_path))
 from tinyalu_utils import get_int, logger  # noqa: E402
 
 

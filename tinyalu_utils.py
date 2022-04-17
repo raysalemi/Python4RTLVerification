@@ -3,8 +3,8 @@ from cocotb.triggers import FallingEdge
 from cocotb.queue import QueueEmpty, Queue
 import enum
 import logging
+import pyuvm
 
-from pyuvm import utility_classes
 
 
 # #### The OPS enumeration
@@ -49,10 +49,10 @@ logger.setLevel(logging.DEBUG)
 # turning a value of x or z to 0
 def get_int(signal):
     try:
-        sig = int(signal.value)
+        int_val = int(signal.value)
     except ValueError:
-        sig = 0
-    return sig
+        int_val = 0
+    return int_val
 
 
 # ## The TinyAluBfm singleton
@@ -60,7 +60,7 @@ def get_int(signal):
 
 
 # Figure 3: Initializing the TinyAluBfm singleton
-class TinyAluBfm(metaclass=utility_classes.Singleton):
+class TinyAluBfm(metaclass=pyuvm.Singleton):
     def __init__(self):
         self.dut = cocotb.top
         self.cmd_driver_queue = Queue(maxsize=1)

@@ -99,11 +99,11 @@ async def inc_test(_):
     logging.info(f"returned {nn}")
 
 
-# ### Killing a task
+# Figure 15: ### Killing a task
 @cocotb.test()
 async def kill_a_running_task(_):
     """Kill a running task"""
-    kill_me = cocotb.start_soon(counter("Long Counter", 1, 1000))
+    kill_me = cocotb.start_soon(counter("Kill me", 1, 1000))
     await Timer(5, units="ns")
     kill_me.kill()
     logger.info("Killed the long-running task.")

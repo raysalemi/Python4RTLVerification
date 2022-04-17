@@ -16,7 +16,7 @@ from tinyalu_utils import TinyAluBfm, Ops, alu_prediction  # noqa: E402
 class BaseTester(uvm_component):
 
     def get_operands(self):
-        raise RuntimeError("You must extend BaseTester and override it.")
+        raise RuntimeError("You must extend BaseTester and override get_operands().")
 
     async def run_phase(self):
         self.raise_objection()

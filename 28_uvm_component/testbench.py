@@ -47,10 +47,11 @@ class PhaseTest(uvm_test):  # uvm_test extends uvm_component
 @pyuvm.test()
 class TestTop(uvm_test):
     def build_phase(self):
+        self.logger.info(f"{self.get_name()} build_phase")
         self.mc = MiddleComp("mc", self)
 
     def final_phase(self):
-        self.logger.info(f"{self.get_name()} final phase")
+        self.logger.info("final phase")
 
 
 # ### MiddleComp (uvm_test_top.mc)
