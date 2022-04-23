@@ -6,7 +6,6 @@ import logging
 import pyuvm
 
 
-
 # #### The OPS enumeration
 
 # Figure 4: The operation enumeration

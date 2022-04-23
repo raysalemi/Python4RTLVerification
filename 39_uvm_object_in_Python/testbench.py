@@ -1,5 +1,4 @@
 import copy
-import cocotb
 import pyuvm
 from pyuvm import *
 # All testbenches use tinyalu_utils, so store it in a central
